@@ -1,0 +1,11 @@
+@import "tailwindcss";
+
+/* 시니어 친화: 기본 폰트 18px 이상, 고대비 */
+@layer base {
+  html {
+    font-size: 18px;
+  }
+  body {
+    @apply bg-white text-black antialiased;
+  }
+}
