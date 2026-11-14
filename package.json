@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage --coverage.include='src/domain/**' --coverage.exclude='src/domain/__tests__/**'"
+    "test:coverage": "vitest run --coverage --coverage.include='src/domain/**' --coverage.exclude='src/domain/__tests__/**'",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-apt-bill 'vitest run --config vitest.rules.config.ts'"
   },
   "dependencies": {
     "firebase": "^11.7.0",
@@ -19,12 +20,14 @@
     "react-dom": "^19.1.0"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^4.0.1",
     "@tailwindcss/vite": "^4.1.7",
     "@types/node": "^22.15.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^4.4.1",
     "@vitest/coverage-v8": "^3.2.7",
+    "firebase-tools": "^13.35.1",
     "tailwindcss": "^4.1.7",
     "typescript": "~5.8.3",
     "vite": "^6.3.5",

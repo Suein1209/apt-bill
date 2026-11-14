@@ -7,6 +7,8 @@ interface ImportMetaEnv {
   readonly VITE_FIREBASE_STORAGE_BUCKET: string;
   readonly VITE_FIREBASE_MESSAGING_SENDER_ID: string;
   readonly VITE_FIREBASE_APP_ID: string;
+  /** 'true' 이면 로컬 Firebase 에뮬레이터 사용 */
+  readonly VITE_USE_FIREBASE_EMULATOR?: string;
 }
 
 interface ImportMeta {

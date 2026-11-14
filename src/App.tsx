@@ -1,9 +1,12 @@
 import type { Auth } from 'firebase/auth';
+import type { Firestore } from 'firebase/firestore';
 import { firebase } from './lib/firebase.ts';
 import { useAuth } from './hooks/useAuth.ts';
 import { LoginScreen } from './components/LoginScreen.tsx';
 import { HomeScreen } from './components/HomeScreen.tsx';
 import { StatusScreen } from './components/StatusScreen.tsx';
+import { LogoutButton } from './components/LogoutButton.tsx';
+import { PROFILE_LOAD_FAILED_TITLE, UNREGISTERED_MESSAGE, UNREGISTERED_TITLE } from './constants/messages.ts';
 
 export default function App() {
   if (!firebase.ok) {
@@ -27,25 +30,34 @@ export default function App() {
       </StatusScreen>
     );
   }
-  return <AuthGate auth={firebase.auth} />;
+  return <AuthGate auth={firebase.auth} db={firebase.db} />;
 }
 
-function AuthGate({ auth }: { auth: Auth }) {
-  const state = useAuth(auth);
+function AuthGate({ auth, db }: { auth: Auth; db: Firestore }) {
+  const state = useAuth(auth, db);
 
   switch (state.status) {
     case 'loading':
       return <StatusScreen title="불러오는 중…" />;
     case 'error':
       return (
-        <StatusScreen title="로그인 상태를 확인하지 못했습니다" tone="error">
+        <StatusScreen title={PROFILE_LOAD_FAILED_TITLE} tone="error">
           <p>{state.message}</p>
           <p>페이지를 새로고침해 주세요.</p>
+          <LogoutButton auth={auth} />
         </StatusScreen>
       );
     case 'signedOut':
       return <LoginScreen auth={auth} />;
+    case 'unregistered':
+      return (
+        <StatusScreen title={UNREGISTERED_TITLE} tone="error">
+          <p>{UNREGISTERED_MESSAGE}</p>
+          <p className="text-slate-700">{state.user.email}</p>
+          <LogoutButton auth={auth} />
+        </StatusScreen>
+      );
     case 'signedIn':
-      return <HomeScreen auth={auth} user={state.user} />;
+      return <HomeScreen auth={auth} profile={state.profile} />;
   }
 }

@@ -1,0 +1,103 @@
+rules_version = '2';
+
+// Design Ref: §4.2 — 권한은 화면이 아니라 보안 규칙에서 강제한다
+// Plan SC: SC-3(관리소장 권한 위반 거부), SC-4(결산된 달 잠금)
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    // users/{uid} 문서가 없는 계정은 역할 없음 → 모든 접근 거부 (U-4)
+    function role() {
+      let path = /databases/$(database)/documents/users/$(request.auth.uid);
+      return exists(path) ? get(path).data.get('role', '') : '';
+    }
+
+    function hasRole(expected) {
+      return signedIn() && role() == expected;
+    }
+
+    function isAdmin()   { return hasRole('admin'); }
+    function isManager() { return hasRole('manager'); }
+    function isStaff()   { return isAdmin() || isManager(); }
+
+    // 관리소장이 수정할 수 있는 유일한 달 (U-7, U-15)
+    function currentMonth() {
+      return get(/databases/$(database)/documents/config/app).data.currentMonth;
+    }
+
+    function monthOpen(ym) {
+      return get(/databases/$(database)/documents/months/$(ym)).data.status == 'open';
+    }
+
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // 월 문서에서 관리소장이 바꿀 수 있는 필드 (U-6, U-12) — status·closing 은 관리자 전용 (U-13)
+    function managerMonthFields() {
+      return ['primaryCosts', 'secondaryCategories', 'vacant', 'water', 'overrides', 'notice', 'updatedAt', 'updatedBy'];
+    }
+
+    // 결산·결산 취소 때 바뀌는 필드 (D-6, D-8)
+    function closingFields() {
+      return ['status', 'closing', 'updatedAt', 'updatedBy'];
+    }
+
+    function isValidAmount(value) {
+      return value is int && value >= 0 && value <= 100000000;
+    }
+
+    function isValidPayment() {
+      return isValidAmount(request.resource.data.paidAmount)
+        && request.resource.data.confirmed is bool;
+    }
+
+    // 관리소장 납부 입력: 현재 달 + 납부 완료 전 + 확인 필드는 건드리지 않음 (U-9, U-10)
+    function managerCanWritePayment(ym) {
+      return isManager()
+        && ym == currentMonth()
+        && (resource == null || resource.data.confirmed == false)
+        && request.resource.data.confirmed == false
+        && request.resource.data.confirmedBy == null;
+    }
+
+    match /users/{uid} {
+      allow read: if signedIn() && request.auth.uid == uid;
+      allow write: if false; // 계정·역할은 Firebase 콘솔에서만 (U-4)
+    }
+
+    match /config/app {
+      allow read: if isStaff();
+      allow write: if isAdmin(); // 새 달 시작 = 관리자 (Design §12 Q1)
+    }
+
+    match /master/units {
+      allow read: if isStaff();
+      allow write: if isAdmin();
+    }
+
+    match /months/{ym} {
+      allow read: if isStaff();
+      allow create: if isAdmin();
+      allow update: if
+        (isAdmin() && resource.data.status == 'open')
+        || (isAdmin() && resource.data.status == 'closed' && changedKeys().hasOnly(closingFields()))
+        || (isManager()
+            && ym == currentMonth()
+            && resource.data.status == 'open'
+            && changedKeys().hasOnly(managerMonthFields()));
+      allow delete: if false;
+
+      match /payments/{unitId} {
+        allow read: if isStaff();
+        allow create, update: if monthOpen(ym)
+          && isValidPayment()
+          && (isAdmin() || managerCanWritePayment(ym));
+        allow delete: if false;
+      }
+    }
+  }
+}

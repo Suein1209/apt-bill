@@ -1,5 +1,7 @@
 import { initializeApp, type FirebaseApp, type FirebaseOptions } from 'firebase/app';
-import { getAuth, type Auth } from 'firebase/auth';
+import { connectAuthEmulator, getAuth, type Auth } from 'firebase/auth';
+import { connectFirestoreEmulator, getFirestore, type Firestore } from 'firebase/firestore';
+import { EMULATOR } from '../constants/firestore.ts';
 
 /** .env 키 이름 ↔ Firebase 설정 필드 매핑 */
 const ENV_KEY_MAP = {
@@ -14,7 +16,7 @@ const ENV_KEY_MAP = {
 type ConfigField = keyof typeof ENV_KEY_MAP;
 
 export type FirebaseInitResult =
-  | { ok: true; app: FirebaseApp; auth: Auth }
+  | { ok: true; app: FirebaseApp; auth: Auth; db: Firestore }
   | { ok: false; missingEnvKeys: string[] }
   | { ok: false; missingEnvKeys: []; errorMessage: string };
 
@@ -34,6 +36,11 @@ function readConfig(): { config: FirebaseOptions; missing: string[] } {
   return { config, missing };
 }
 
+/** VITE_USE_FIREBASE_EMULATOR=true 이면 로컬 에뮬레이터에 연결 (개발·테스트용) */
+function isEmulatorEnabled(): boolean {
+  return import.meta.env.VITE_USE_FIREBASE_EMULATOR === 'true';
+}
+
 function initFirebase(): FirebaseInitResult {
   const { config, missing } = readConfig();
   if (missing.length > 0) {
@@ -41,7 +48,13 @@ function initFirebase(): FirebaseInitResult {
   }
   try {
     const app = initializeApp(config);
-    return { ok: true, app, auth: getAuth(app) };
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    if (isEmulatorEnabled()) {
+      connectAuthEmulator(auth, EMULATOR.authUrl, { disableWarnings: true });
+      connectFirestoreEmulator(db, EMULATOR.host, EMULATOR.firestorePort);
+    }
+    return { ok: true, app, auth, db };
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
     return { ok: false, missingEnvKeys: [], errorMessage: message };
