@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import type { Auth } from 'firebase/auth';
 import type { Firestore } from 'firebase/firestore';
-import { CalendarPlus, Calculator } from 'lucide-react';
+import { CalendarPlus, Calculator, Printer } from 'lucide-react';
 import { BigButton } from '../../components/BigButton.tsx';
 import { StatusScreen } from '../../components/StatusScreen.tsx';
 import { formatWon } from '../../domain/format.ts';
@@ -17,11 +17,13 @@ import { NewMonthDialog } from './NewMonthDialog.tsx';
 import { monthAccess } from './monthAccess.ts';
 import { CostEntryScreen } from '../cost/CostEntryScreen.tsx';
 import { UnitGrid } from '../entry/UnitGrid.tsx';
+import { PaymentSheetView, type SheetMode } from '../print/PaymentSheetView.tsx';
+import { PrintMenuDialog } from '../print/PrintMenuDialog.tsx';
 import { unitsInDong } from '../../domain/units.ts';
 import type { MonthMap } from '../../services/firestore/monthRepo.ts';
 import type { Unit, UserDoc, YearMonth } from '../../types/bill.ts';
 
-type View = { kind: 'home' } | { kind: 'cost' } | { kind: 'dong'; dong: number };
+type View = { kind: 'home' } | { kind: 'cost' } | { kind: 'dong'; dong: number } | { kind: 'print'; mode: SheetMode };
 
 interface MonthHomeProps {
   auth: Auth;
@@ -39,6 +41,7 @@ interface MonthHomeProps {
 export function MonthHome({ auth, db, uid, profile, units, months, monthList, currentMonth, target, onSelectMonth }: MonthHomeProps) {
   const [view, setView] = useState<View>({ kind: 'home' });
   const [startingMonth, setStartingMonth] = useState(false);
+  const [printMenuOpen, setPrintMenuOpen] = useState(false);
   const state = useMonthBills(db, units, months, target);
   const isAdmin = profile.role === 'admin';
 
@@ -57,6 +60,9 @@ export function MonthHome({ auth, db, uid, profile, units, months, monthList, cu
 
   if (view.kind === 'cost') {
     return <CostEntryScreen db={db} uid={uid} month={month} summary={summary} access={access} onBack={() => setView({ kind: 'home' })} />;
+  }
+  if (view.kind === 'print') {
+    return <PaymentSheetView mode={view.mode} yearMonth={month.yearMonth} units={units} bills={bills} onClose={() => setView({ kind: 'home' })} />;
   }
   if (view.kind === 'dong') {
     return (
@@ -109,17 +115,29 @@ export function MonthHome({ auth, db, uid, profile, units, months, monthList, cu
 
         <DongButtonGrid units={units} bills={bills} onSelectDong={(dong) => setView({ kind: 'dong', dong })} />
 
-        {isAdmin && (
-          <section className="flex flex-wrap gap-4 border-t-2 border-slate-300 pt-6">
-            {target === latest && (
-              <BigButton variant="secondary" icon={<CalendarPlus className="h-6 w-6" aria-hidden="true" />} onClick={() => setStartingMonth(true)}>
-                새 달 시작
-              </BigButton>
-            )}
-            <CloseMonthButton db={db} uid={uid} month={month} bills={bills} />
-          </section>
-        )}
+        {/* 맨 아래 — 새 달 시작·결산(관리자), 출력(모두) */}
+        <section className="flex flex-wrap gap-4 border-t-2 border-slate-300 pt-6">
+          {isAdmin && target === latest && (
+            <BigButton variant="secondary" icon={<CalendarPlus className="h-6 w-6" aria-hidden="true" />} onClick={() => setStartingMonth(true)}>
+              새 달 시작
+            </BigButton>
+          )}
+          {isAdmin && <CloseMonthButton db={db} uid={uid} month={month} bills={bills} />}
+          <BigButton variant="secondary" icon={<Printer className="h-6 w-6" aria-hidden="true" />} onClick={() => setPrintMenuOpen(true)}>
+            출력
+          </BigButton>
+        </section>
       </main>
+
+      {printMenuOpen && (
+        <PrintMenuDialog
+          onSelect={(mode) => {
+            setPrintMenuOpen(false);
+            setView({ kind: 'print', mode });
+          }}
+          onCancel={() => setPrintMenuOpen(false)}
+        />
+      )}
 
       {startingMonth && latest && (
         <NewMonthDialog
