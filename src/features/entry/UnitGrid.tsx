@@ -2,7 +2,7 @@
  * 동별 입력 Grid — 공실·수도·직접 수정·납부 (Design §5.1, §5.4 동별 Grid)
  * Plan SC: SC-1(키보드만으로 한 달 입력), SC-6(새로고침해도 임시저장으로 복구)
  */
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { Firestore } from 'firebase/firestore';
 import { ArrowLeft, RotateCcw } from 'lucide-react';
 import { BigButton } from '../../components/BigButton.tsx';
@@ -11,9 +11,11 @@ import {
   INVALID_DATE_MESSAGE,
   INVALID_USAGE_MESSAGE,
   SAVE_FAILED_PREFIX,
+  paidOverChargedMessage,
 } from '../../constants/messages.ts';
 import { formatNumber, formatWon, formatYearMonth, isISODate, parseAmountInput, parseUsageInput, todayISODate } from '../../domain/format.ts';
 import { isValidAmount } from '../../domain/money.ts';
+import { canToggleConfirmed, exceedsCharged, isFullyPaid, paidDateFor } from '../../domain/payment.ts';
 import { unitLabel } from '../../domain/unitLabel.ts';
 import { useDraftEntries } from '../../hooks/useDraftEntries.ts';
 import { saveUnitField, saveWaterField } from '../../services/firestore/monthRepo.ts';
@@ -65,6 +67,8 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
   const { register, onKeyDown } = useGridKeyboard(units.length, COL_COUNT);
   const billById = useMemo(() => new Map(bills.map((bill) => [bill.unitId, bill])), [bills]);
   const isAdmin = role === 'admin';
+  /** 세대별로 진행 중인 납부 금액 저장 — "채우기"가 그 뒤에 저장되도록 기다린다 */
+  const pendingPaid = useRef(new Map<string, Promise<string | null>>());
 
   /** 저장 실행 + 저장 상태 표시 — 결과를 그대로 돌려준다 */
   const track = async (task: Promise<Result<void>>): Promise<Result<void>> => {
@@ -88,6 +92,7 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
   const commitCell = async (unitId: string, field: DraftField, text: string): Promise<string | null> => {
     const key = cellKey(unitId, field);
     const payment = payments[unitId];
+    const charged = billById.get(unitId)?.charged ?? 0;
 
     switch (field) {
       case 'usage': {
@@ -110,9 +115,13 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
       case 'paid': {
         const paidAmount = parseWonText(text);
         if (paidAmount === null) return INVALID_AMOUNT_MESSAGE;
-        // 납부일이 비어 있고 따로 입력 중인 납부일도 없을 때만 오늘 날짜를 넣는다
-        const needsDate = !payment?.paidDate && paidAmount > 0 && draft[cellKey(unitId, 'paidDate')] === undefined;
-        return drafts.commit(key, track(savePayment(db, ym, unitId, needsDate ? { paidAmount, paidDate: todayISODate() } : { paidAmount }, uid)));
+        if (exceedsCharged(paidAmount, charged)) return paidOverChargedMessage(formatWon(charged));
+        // 다 내면 납부일을 넣고(기존 날짜·입력 중인 날짜 우선), 덜 내면 납부일을 지운다 (G-14)
+        const paidDate = paidDateFor(paidAmount, charged, payment?.paidDate ?? null, todayISODate());
+        const keepDraftDate = paidDate !== null && draft[cellKey(unitId, 'paidDate')] !== undefined;
+        const saving = drafts.commit(key, track(savePayment(db, ym, unitId, keepDraftDate ? { paidAmount } : { paidAmount, paidDate }, uid)));
+        pendingPaid.current.set(unitId, saving);
+        return saving;
       }
       case 'paidDate': {
         const trimmed = text.trim();
@@ -120,6 +129,16 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
         return drafts.commit(key, track(savePayment(db, ym, unitId, { paidDate: trimmed === '' ? null : trimmed }, uid)));
       }
     }
+  };
+
+  /**
+   * "채우기" — 입력 중이던 납부 금액(초과·부족·오류 포함)을 버리고 청구액 전액으로 저장한다 (G-12).
+   * 칸을 떠나며 시작된 저장이 있으면 끝난 뒤에 저장해 청구액이 마지막 값이 되게 한다.
+   */
+  const fillCharged = async (unitId: string, charged: Won, currentDate: string | null) => {
+    await pendingPaid.current.get(unitId);
+    drafts.clear(cellKey(unitId, 'paid'));
+    await track(savePayment(db, ym, unitId, { paidAmount: charged, paidDate: currentDate ?? todayISODate() }, uid));
   };
 
   const [showRestore, setShowRestore] = useState(drafts.pending.length > 0);
@@ -194,6 +213,9 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
                 const isOffice = unit.kind === 'office';
                 const lockedForManager = !isAdmin && bill.isConfirmed;
                 const canPay = access.canEdit && (bill.isTarget || bill.charged > 0) && !lockedForManager;
+                const fullyPaid = isFullyPaid(bill);
+                // 납부 완료 가능 표시는 관리자에게만 (관리소장은 납부 완료를 누를 수 없다)
+                const showConfirmReady = isAdmin && fullyPaid;
                 const canWater = access.canEdit && bill.isTarget && unit.kind === 'residential';
                 const autoBase = bill.primaryShare + bill.secondaryShare + bill.water;
                 const nav = (col: number) => (event: Parameters<typeof onKeyDown>[0]) => onKeyDown(event, row, col);
@@ -289,11 +311,7 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
                         type="button"
                         disabled={!canPay || bill.charged <= 0}
                         onKeyDown={nav(COL.fill)}
-                        onClick={() =>
-                          void track(
-                            savePayment(db, ym, unit.id, { paidAmount: bill.charged, paidDate: payment?.paidDate ?? todayISODate() }, uid),
-                          )
-                        }
+                        onClick={() => void fillCharged(unit.id, bill.charged, payment?.paidDate ?? null)}
                         className="whitespace-nowrap rounded-md border-2 border-blue-800 px-3 py-1 font-bold text-blue-900 hover:bg-blue-50 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:border-slate-300 disabled:text-slate-400"
                       >
                         채우기
@@ -304,7 +322,7 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
                         label={`${unitLabel(unit)} 납부일`}
                         value={payment?.paidDate ?? ''}
                         draft={draftOf('paidDate')}
-                        disabled={!canPay}
+                        disabled={!canPay || !fullyPaid}
                         align="left"
                         inputRef={register(row, COL.paidDate)}
                         onNavigate={nav(COL.paidDate)}
@@ -313,16 +331,22 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
                       />
                     </td>
                     <td className="px-2 text-center">
-                      <input
-                        ref={register(row, COL.confirm)}
-                        type="checkbox"
-                        aria-label={`${unitLabel(unit)} 납부 완료`}
-                        className="h-7 w-7 accent-green-700"
-                        checked={bill.isConfirmed}
-                        disabled={!isAdmin || !access.canEdit || (!bill.isTarget && bill.charged <= 0)}
-                        onKeyDown={nav(COL.confirm)}
-                        onChange={(event) => void track(setPaymentConfirmed(db, ym, unit.id, event.target.checked, uid))}
-                      />
+                      {/* 다 낸 세대는 녹색 테두리 — 관리자가 납부 완료를 누를 수 있다는 표시, 관리자 화면에만 (G-15) */}
+                      <div
+                        title={showConfirmReady ? '청구액을 모두 냈습니다' : undefined}
+                        className={`inline-flex rounded-lg border-4 p-1 ${showConfirmReady ? 'border-green-600 bg-green-50' : 'border-transparent'}`}
+                      >
+                        <input
+                          ref={register(row, COL.confirm)}
+                          type="checkbox"
+                          aria-label={`${unitLabel(unit)} 납부 완료`}
+                          className="h-7 w-7 accent-green-700"
+                          checked={bill.isConfirmed}
+                          disabled={!isAdmin || !access.canEdit || !canToggleConfirmed(bill)}
+                          onKeyDown={nav(COL.confirm)}
+                          onChange={(event) => void track(setPaymentConfirmed(db, ym, unit.id, event.target.checked, uid))}
+                        />
+                      </div>
                     </td>
                   </tr>
                 );

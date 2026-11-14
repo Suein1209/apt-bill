@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent, type Ref } from 'react';
+import { useEffect, useState, type KeyboardEvent, type Ref } from 'react';
 import { useDraftSync } from '../../components/useDraftSync.ts';
 
 interface GridInputProps {
@@ -21,6 +21,11 @@ interface GridInputProps {
 export function GridInput({ label, value, draft, disabled, align = 'right', highlighted = false, inputRef, onNavigate, onDraft, onCommit }: GridInputProps) {
   const { text, dirty, edit, setDirty } = useDraftSync(value, draft);
   const [error, setError] = useState<string | null>(null);
+
+  // 임시저장이 사라지면(다른 동작으로 값이 새로 저장됨 등) 오류 표시도 지운다
+  useEffect(() => {
+    if (draft === undefined) setError(null);
+  }, [draft]);
 
   const commit = async () => {
     if (!dirty) return;

@@ -29,3 +29,6 @@ export const FIRST_MONTH_MANAGER_MESSAGE = '아직 시작된 달이 없습니다
 export const INVALID_USAGE_MESSAGE = '사용량은 0 이상 숫자로, 소수는 첫째 자리까지 입력해 주세요.';
 export const INVALID_DATE_MESSAGE = '날짜는 2026-11-14 처럼 입력해 주세요.';
 export const SAVE_FAILED_PREFIX = '저장하지 못했습니다';
+
+/** 납부 금액이 청구액을 넘을 때 (G-13) */
+export const paidOverChargedMessage = (charged: string) => `청구액(${charged})보다 많이 입력할 수 없습니다.`;
