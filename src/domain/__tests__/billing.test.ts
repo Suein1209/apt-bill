@@ -5,6 +5,7 @@ import {
   computeCarryOvers,
   countTargets,
   dongStatus,
+  isDongFullyPaid,
   summarizeMonth,
   type MonthRecord,
 } from '../billing.ts';
@@ -211,5 +212,13 @@ describe('동 버튼 미납 현황 (G-4, G-7, G-10, G-11)', () => {
     const bills = computeBills(units, month, {}, {});
     // 5동 = 주거 14 − 공실 1 + 상가 110·오리집 2 = 15
     expect(dongStatus(units, bills, 5)).toEqual({ dong: 5, targetCount: 13, unpaidCount: 13 });
+  });
+});
+
+describe('동 전 세대 납부 완료 (G-16)', () => {
+  it('부과 대상이 있고 미납이 0이면 완납, 부과 대상이 없으면 완납 아님', () => {
+    expect(isDongFullyPaid({ dong: 1, targetCount: 15, unpaidCount: 0 })).toBe(true);
+    expect(isDongFullyPaid({ dong: 1, targetCount: 15, unpaidCount: 1 })).toBe(false);
+    expect(isDongFullyPaid({ dong: 1, targetCount: 0, unpaidCount: 0 })).toBe(false);
   });
 });

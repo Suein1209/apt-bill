@@ -181,6 +181,11 @@ export function computeCarryOvers(
  * 동별 미납 세대 수 — 이번 달, 부과 대상만, 관리자 "납부 완료"가 아니면 미납
  * (G-4, G-6, G-7, G-10, G-11)
  */
+/** 그 동 부과 대상이 있고, 모두 관리자가 "납부 완료"를 눌렀는지 (G-16) */
+export function isDongFullyPaid(status: DongStatus): boolean {
+  return status.targetCount > 0 && status.unpaidCount === 0;
+}
+
 export function dongStatus(units: readonly Unit[], bills: readonly UnitBill[], dong: number): DongStatus {
   const billById = new Map(bills.map((bill) => [bill.unitId, bill]));
   const targets = unitsInDong(units, dong)
