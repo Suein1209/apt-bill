@@ -13,3 +13,6 @@ dist-ssr
 
 # bkit 플러그인 실행 기록·상태
 .bkit/
+
+# 테스트 커버리지 결과
+coverage/

@@ -1,124 +1,205 @@
 /**
  * 관리비 도메인 타입
  *
- * 저장 구조: Firestore `bills/{yearMonth}` 단일 문서 = MonthlyBillDocument
- * (100세대 데이터를 한 문서에 통째로 저장 → 월 1회 읽기/쓰기)
+ * Design Ref: §3.1 — Option C 저장 구조
+ *   months/{ym}                    월 문서 (MonthDoc)
+ *   months/{ym}/payments/{unitId}  세대별 납부 (PaymentDoc)
+ *   master/units                   부과 단위 마스터 (MasterUnitsDoc)
+ *   users/{uid}                    역할 (UserDoc)
+ *   config/app                     현재 달 (AppConfigDoc)
  *
- * 금액 단위는 모두 '원'(정수)이며, 소수점은 사용하지 않는다.
+ * 저장하는 것은 입력값뿐이며, 분배액·청구액·이월액(UnitBill)은 저장하지 않고 매번 계산한다.
+ * 금액은 모두 '원' 단위 정수다.
  */
 
 /* ------------------------------------------------------------------ */
 /* 공통 원시 타입                                                        */
 /* ------------------------------------------------------------------ */
 
-/** 금액(원, 0 이상의 정수) */
+/** 금액(원, 정수). 이월 미납은 초과 납부 시 음수가 될 수 있다. */
 export type Won = number;
 
-/** ISO 8601 날짜/시각 문자열 (예: "2026-11-09T12:34:56.000Z") */
-export type ISODateString = string;
+/** 날짜 문자열 "YYYY-MM-DD" (납부일) */
+export type ISODate = string;
 
-type Month = '01' | '02' | '03' | '04' | '05' | '06' | '07' | '08' | '09' | '10' | '11' | '12';
+/** ISO 8601 날짜·시각 문자열 */
+export type ISODateTime = string;
 
-/** 부과 연월 (예: "2026-11") — Firestore 문서 ID로도 사용 */
+export type Month = '01' | '02' | '03' | '04' | '05' | '06' | '07' | '08' | '09' | '10' | '11' | '12';
+
+/** 부과 연월 "YYYY-MM" — Firestore 월 문서 ID */
 export type YearMonth = `${number}-${Month}`;
 
 /* ------------------------------------------------------------------ */
-/* 세대 정보                                                             */
-/* ------------------------------------------------------------------ */
-
-/** 세대 고유 키 — `${dong}-${ho}` 형식 (예: "101-1203") */
-export type HouseholdId = `${string}-${string}`;
-
-export interface Household {
-  /** 동 (예: "101") */
-  dong: string;
-  /** 호수 (예: "1203") */
-  ho: string;
-}
-
-/* ------------------------------------------------------------------ */
-/* 관리비 항목 (확장 가능)                                               */
+/* 부과 단위 (세대·상가·관리사무소)                                       */
 /* ------------------------------------------------------------------ */
 
 /**
- * 관리비 항목 키.
- * 기본 항목은 constants/feeItems.ts 의 DEFAULT_FEE_ITEMS 에 정의되며,
- * 코드 수정 없이 새 항목을 추가할 수 있도록 string 으로 열어 둔다.
+ * 부과 단위 ID
+ * - 주거: 'R' + 호수            예) R201, R820   (호수는 건물 전체에서 유일, H-18)
+ * - 상가: 'S' + 호수[_순번]     예) S102, S101_1 (H-15)
+ * - 오리집: 'SORI'              (H-22, 두 공간 = 부과 단위 1개)
+ * - 관리사무소: 'S112'          (H-20)
  */
-export type FeeItemKey = string;
+export type UnitId = string;
 
-/** 항목 분류 — 고지서에서 그룹핑/소계에 사용 */
-export type FeeCategory =
-  /** 공용관리비 (일반관리비, 청소비, 승강기유지비 등) */
-  | 'common'
-  /** 세대 사용료 (세대전기료, 세대수도료 등 개별 검침) */
-  | 'individual';
+export type UnitKind = 'residential' | 'shop' | 'office';
 
-/** 관리비 항목 정의 (메타데이터) */
-export interface FeeItemDefinition {
-  key: FeeItemKey;
-  /** 화면/고지서 표시명 (예: "일반관리비") */
-  label: string;
-  category: FeeCategory;
-  /** 입력 Grid 열 순서 및 고지서 표시 순서 (오름차순) */
-  order: number;
+export interface Unit {
+  id: UnitId;
+  kind: UnitKind;
+  /** 소속 동 (1~9). 오리집만 [5, 6] */
+  dongs: readonly number[];
+  floor: number;
+  /** 표시용 호수 "201", "101-1". 호수 없이 별칭으로만 부르는 곳(오리집)은 null */
+  ho: string | null;
+  /** 별칭 — '오리집', '관리사무소' (H-12) */
+  alias: string | null;
+  /** 상호명 — 상호 목록 수령 후 입력 (H-14) */
+  shopName: string | null;
+  /** 동·호수 정렬 키 (P-13) */
+  sortKey: number;
 }
 
-/** 세대별 항목 금액 — 정의되지 않은 항목은 0원으로 취급 */
-export type FeeCharges = Partial<Record<FeeItemKey, Won>>;
-
-/* ------------------------------------------------------------------ */
-/* 납부 상태                                                             */
-/* ------------------------------------------------------------------ */
-
-export type PaymentStatus =
-  | { isPaid: false; paidAt: null }
-  | { isPaid: true; /** 납부 확인 일시 */ paidAt: ISODateString };
-
-/* ------------------------------------------------------------------ */
-/* 세대별 관리비                                                         */
-/* ------------------------------------------------------------------ */
-
-export interface HouseholdBill {
-  id: HouseholdId;
-  household: Household;
-  /** 항목별 금액 */
-  charges: FeeCharges;
-  /**
-   * 합계 금액(원).
-   * charges 로부터 계산되는 파생값이지만, 고지서 출력/조회 시 재계산 없이
-   * 쓰기 위해 저장 시점에 함께 기록한다. (저장 직전 반드시 재계산할 것)
-   */
-  totalAmount: Won;
-  payment: PaymentStatus;
-  /** 비고 (선택) */
-  memo?: string;
-}
-
-/* ------------------------------------------------------------------ */
-/* 월별 문서                                                             */
-/* ------------------------------------------------------------------ */
-
-/** Firestore `bills/{yearMonth}` 문서 */
-export interface MonthlyBillDocument {
-  yearMonth: YearMonth;
-  updatedAt: ISODateString;
-  /**
-   * 해당 월에 사용된 항목 정의 스냅샷.
-   * 이후 항목이 추가/변경되어도 과거 고지서가 당시 기준대로 출력되도록 문서에 함께 저장한다.
-   */
-  feeItems: FeeItemDefinition[];
-  items: HouseholdBill[];
-}
-
-/* ------------------------------------------------------------------ */
-/* localStorage 임시저장 (Draft)                                         */
-/* ------------------------------------------------------------------ */
-
-export interface MonthlyBillDraft {
-  /** 스키마 버전 — 구조 변경 시 오래된 Draft 를 안전하게 폐기하기 위함 */
+/** master/units (D-5) */
+export interface MasterUnitsDoc {
   version: number;
-  document: MonthlyBillDocument;
-  /** 임시저장 시각 */
-  savedAt: ISODateString;
+  units: Unit[];
+  updatedAt: ISODateTime;
+}
+
+/* ------------------------------------------------------------------ */
+/* 사용자·설정                                                          */
+/* ------------------------------------------------------------------ */
+
+export type UserRole = 'admin' | 'manager';
+
+/** users/{uid} (U-5) */
+export interface UserDoc {
+  role: UserRole;
+  displayName: string;
+}
+
+/** config/app — 관리소장이 수정할 수 있는 유일한 달 (U-7, U-15) */
+export interface AppConfigDoc {
+  currentMonth: YearMonth;
+}
+
+/* ------------------------------------------------------------------ */
+/* 관리비 항목                                                          */
+/* ------------------------------------------------------------------ */
+
+/** 1차 항목(공통 비용) — 고정 4개 (F-4, F-7) */
+export type PrimaryFeeKey = 'labor' | 'commonElectricity' | 'commonWater' | 'maintenance';
+
+export interface PrimaryFeeItem {
+  key: PrimaryFeeKey;
+  label: string;
+}
+
+/** 2차 항목 — 이름과 금액만 (F-10) */
+export interface SecondaryItem {
+  id: string;
+  name: string;
+  amount: Won;
+}
+
+/** 2차 카테고리 > 항목 (F-5) */
+export interface SecondaryCategory {
+  id: string;
+  name: string;
+  items: SecondaryItem[];
+}
+
+/** 세대별 수도 — 이번 달 사용량과 요금을 직접 입력 (F-11, F-12) */
+export interface WaterEntry {
+  usage: number;
+  amount: Won;
+}
+
+/* ------------------------------------------------------------------ */
+/* 월 문서 · 납부                                                        */
+/* ------------------------------------------------------------------ */
+
+export type MonthStatus = 'open' | 'closed';
+
+/** 결산 스냅샷 — 이월 계산이 이 달에서 멈추는 기준 (D-6, D-9) */
+export interface ClosingSnapshot {
+  closedAt: ISODateTime;
+  closedBy: string;
+  /** 결산 시점 미납액 (0이 아닌 부과 단위만) */
+  unpaid: Record<UnitId, Won>;
+}
+
+/** months/{ym} */
+export interface MonthDoc {
+  yearMonth: YearMonth;
+  status: MonthStatus;
+  primaryCosts: Record<PrimaryFeeKey, Won>;
+  secondaryCategories: SecondaryCategory[];
+  /** 공실 체크 (H-24) */
+  vacant: Record<UnitId, true>;
+  /** 주거 세대별 수도 (F-3) */
+  water: Record<UnitId, WaterEntry>;
+  /** 직접 수정한 '이번 달 관리비'(이월 제외) (C-6, Design §12 Q3) */
+  overrides: Record<UnitId, Won>;
+  /** 고지서 안내문 (P-3 자리) */
+  notice: string;
+  closing: ClosingSnapshot | null;
+  updatedAt: ISODateTime;
+  updatedBy: string;
+}
+
+/** months/{ym}/payments/{unitId} */
+export interface PaymentDoc {
+  paidAmount: Won;
+  paidDate: ISODate | null;
+  /** 관리자 "납부 완료" 확인 (U-9, U-11) */
+  confirmed: boolean;
+  confirmedBy: string | null;
+  confirmedAt: ISODateTime | null;
+  updatedAt: ISODateTime;
+  updatedBy: string;
+}
+
+/* ------------------------------------------------------------------ */
+/* 계산 결과 (저장하지 않음)                                              */
+/* ------------------------------------------------------------------ */
+
+export interface UnitBill {
+  unitId: UnitId;
+  /** 부과 대상 여부 — 관리사무소·공실이면 false (H-9, H-10) */
+  isTarget: boolean;
+  /** 1차 분배액, 표시용 원 미만 버림 (C-13) */
+  primaryShare: Won;
+  /** 2차 분배액, 표시용 원 미만 버림 (C-13) */
+  secondaryShare: Won;
+  /** 수도 요금 (주거 부과 대상만) */
+  water: Won;
+  /** 직접 수정한 이번 달 관리비. 직접 수정하지 않았으면 null */
+  override: Won | null;
+  /** 이월 미납 (C-8). 초과 납부면 음수 */
+  carryOver: Won;
+  /** 최종 청구액 — 최종 합계에서 한 번만 10원 올림 (C-5, C-11) */
+  charged: Won;
+  paid: Won;
+  /** charged − paid */
+  unpaid: Won;
+  isConfirmed: boolean;
+}
+
+/** 월 합계 — 비용 입력 화면, 관리비 풀이 내역 (F-14, P-12) */
+export interface MonthSummary {
+  primaryTotal: Won;
+  secondaryTotal: Won;
+  targetCount: number;
+  /** 세대당 분배액 (1차+2차), 원 미만 버림 */
+  perUnitShare: Won;
+}
+
+/** 동 버튼 미납 현황 (G-4) */
+export interface DongStatus {
+  dong: number;
+  targetCount: number;
+  unpaidCount: number;
 }
