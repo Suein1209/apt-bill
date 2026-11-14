@@ -23,6 +23,11 @@ describe('표시 이름 (H-11 ~ H-23)', () => {
     expect(unitLabel({ ...unit('S110'), shopName: 'OO식당' }, { withDong: true })).toBe('5동 110호 (OO식당)');
   });
 
+  it('내역서로 확인한 상호 — 4동 107호 혜선집, 6동 111호-1 유리', () => {
+    expect(unitLabel(unit('S107'), { withDong: true })).toBe('4동 107호 (혜선집)');
+    expect(unitLabel(unit('S111_1'), { withDong: true })).toBe('6동 111호-1 (유리)');
+  });
+
   it('관리사무소와 오리집', () => {
     expect(unitLabel(unit('S112'))).toBe('112호 관리사무소');
     expect(unitLabel(unit('SORI'), { withDong: true })).toBe('5·6동 오리집');

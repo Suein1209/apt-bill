@@ -22,6 +22,8 @@ export interface FirstFloorUnitSpec {
   dongs: readonly number[];
   ho: string | null;
   alias: string | null;
+  /** 상호 (H-14) — 모르면 null */
+  shopName: string | null;
 }
 
 /**
@@ -29,30 +31,30 @@ export interface FirstFloorUnitSpec {
  * 오리집1(5동)·오리집2(6동)는 한 부과 단위 SORI (H-22)
  */
 export const FIRST_FLOOR_UNITS: readonly FirstFloorUnitSpec[] = [
-  { id: 'S102', kind: 'shop', dongs: [1], ho: '102', alias: null },
-  { id: 'S101_1', kind: 'shop', dongs: [1], ho: '101-1', alias: null },
-  { id: 'S101_2', kind: 'shop', dongs: [1], ho: '101-2', alias: null },
-  { id: 'S104', kind: 'shop', dongs: [2], ho: '104', alias: null },
-  { id: 'S103', kind: 'shop', dongs: [2], ho: '103', alias: null },
-  { id: 'S106', kind: 'shop', dongs: [3], ho: '106', alias: null },
-  { id: 'S105', kind: 'shop', dongs: [3], ho: '105', alias: null },
-  { id: 'S109', kind: 'shop', dongs: [4], ho: '109', alias: null },
-  { id: 'S108', kind: 'shop', dongs: [4], ho: '108', alias: null },
-  { id: 'S107', kind: 'shop', dongs: [4], ho: '107', alias: null },
-  { id: 'S110', kind: 'shop', dongs: [5], ho: '110', alias: null },
-  { id: 'SORI', kind: 'shop', dongs: [5, 6], ho: null, alias: '오리집' },
-  { id: 'S112', kind: 'office', dongs: [6], ho: '112', alias: '관리사무소' },
-  { id: 'S111_2', kind: 'shop', dongs: [6], ho: '111-2', alias: null },
-  { id: 'S111_1', kind: 'shop', dongs: [6], ho: '111-1', alias: null },
-  { id: 'S114', kind: 'shop', dongs: [7], ho: '114', alias: null },
-  { id: 'S113', kind: 'shop', dongs: [7], ho: '113', alias: null },
-  { id: 'S116', kind: 'shop', dongs: [8], ho: '116', alias: null },
-  { id: 'S115', kind: 'shop', dongs: [8], ho: '115', alias: null },
-  { id: 'S118', kind: 'shop', dongs: [9], ho: '118', alias: null },
-  { id: 'S117', kind: 'shop', dongs: [9], ho: '117', alias: null },
+  { id: 'S102', kind: 'shop', dongs: [1], ho: '102', alias: null, shopName: null },
+  { id: 'S101_1', kind: 'shop', dongs: [1], ho: '101-1', alias: null, shopName: null },
+  { id: 'S101_2', kind: 'shop', dongs: [1], ho: '101-2', alias: null, shopName: null },
+  { id: 'S104', kind: 'shop', dongs: [2], ho: '104', alias: null, shopName: null },
+  { id: 'S103', kind: 'shop', dongs: [2], ho: '103', alias: null, shopName: null },
+  { id: 'S106', kind: 'shop', dongs: [3], ho: '106', alias: null, shopName: null },
+  { id: 'S105', kind: 'shop', dongs: [3], ho: '105', alias: null, shopName: null },
+  { id: 'S109', kind: 'shop', dongs: [4], ho: '109', alias: null, shopName: null },
+  { id: 'S108', kind: 'shop', dongs: [4], ho: '108', alias: null, shopName: null },
+  { id: 'S107', kind: 'shop', dongs: [4], ho: '107', alias: null, shopName: '혜선집' },
+  { id: 'S110', kind: 'shop', dongs: [5], ho: '110', alias: null, shopName: null },
+  { id: 'SORI', kind: 'shop', dongs: [5, 6], ho: null, alias: '오리집', shopName: null },
+  { id: 'S112', kind: 'office', dongs: [6], ho: '112', alias: '관리사무소', shopName: null },
+  { id: 'S111_2', kind: 'shop', dongs: [6], ho: '111-2', alias: null, shopName: null },
+  { id: 'S111_1', kind: 'shop', dongs: [6], ho: '111-1', alias: null, shopName: '유리' },
+  { id: 'S114', kind: 'shop', dongs: [7], ho: '114', alias: null, shopName: null },
+  { id: 'S113', kind: 'shop', dongs: [7], ho: '113', alias: null, shopName: null },
+  { id: 'S116', kind: 'shop', dongs: [8], ho: '116', alias: null, shopName: null },
+  { id: 'S115', kind: 'shop', dongs: [8], ho: '115', alias: null, shopName: null },
+  { id: 'S118', kind: 'shop', dongs: [9], ho: '118', alias: null, shopName: null },
+  { id: 'S117', kind: 'shop', dongs: [9], ho: '117', alias: null, shopName: null },
 ];
 
 export const RESIDENTIAL_ID_PREFIX = 'R';
 
-/** master/units 스키마 버전 */
-export const MASTER_UNITS_VERSION = 2;
+/** master/units 스키마 버전 — 올리면 관리자가 다음에 접속할 때 세대 목록을 새로 저장한다 */
+export const MASTER_UNITS_VERSION = 3;

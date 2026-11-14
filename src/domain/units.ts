@@ -67,7 +67,7 @@ function buildFirstFloorUnits(): Unit[] {
       floor: FIRST_FLOOR,
       ho: spec.ho,
       alias: spec.alias,
-      shopName: null,
+      shopName: spec.shopName,
       sortKey: sortKey(firstDong, FIRST_FLOOR, order),
     };
   });
