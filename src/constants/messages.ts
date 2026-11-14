@@ -2,7 +2,7 @@ import type { UserRole } from '../types/bill.ts';
 
 /** Firestore 오류 코드 → 사용자 안내 (Design §6.1) */
 export const FIRESTORE_ERROR_MESSAGES: Readonly<Record<string, string>> = {
-  'permission-denied': '이 내용은 수정할 수 없습니다.',
+  'permission-denied': '이 달은 수정할 수 없습니다.',
   unavailable: '인터넷 연결을 확인해 주세요. 입력한 내용은 임시로 보관됩니다.',
   aborted: '다른 사람이 먼저 고쳤습니다. 화면을 새 내용으로 바꿨습니다.',
   'deadline-exceeded': '응답이 늦어지고 있습니다. 잠시 후 다시 시도해 주세요.',

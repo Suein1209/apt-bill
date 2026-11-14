@@ -95,9 +95,13 @@ function parseMap<T>(data: unknown, parseValue: (value: unknown) => T | null): R
 const parseWon = (value: unknown): Won | null => (isInt(value) ? value : null);
 const parseTrue = (value: unknown): true | null => (value === true ? true : null);
 
+/** 수도 사용량·요금은 칸마다 따로 저장되므로(G1) 한쪽만 있어도 읽는다 — 없는 값은 0 */
 function parseWater(value: unknown): WaterEntry | null {
-  if (!isRecord(value) || typeof value.usage !== 'number' || !isInt(value.amount)) return null;
-  return { usage: value.usage, amount: value.amount };
+  if (!isRecord(value)) return null;
+  const usage = value.usage ?? 0;
+  const amount = value.amount ?? 0;
+  if (typeof usage !== 'number' || !isInt(amount)) return null;
+  return { usage, amount };
 }
 
 function parsePrimaryCosts(data: unknown): Record<PrimaryFeeKey, Won> | null {

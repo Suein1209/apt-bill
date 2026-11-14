@@ -1,13 +1,17 @@
 /**
  * 이번 달 비용 입력 — 1차 4칸 + 2차 카테고리·항목 + 합계 (F-1 ~ F-15, P-12 미리보기)
  */
+import { useState } from 'react';
 import type { Firestore } from 'firebase/firestore';
 import { ArrowLeft } from 'lucide-react';
 import { BigButton } from '../../components/BigButton.tsx';
 import { MoneyInput } from '../../components/MoneyInput.tsx';
 import { PRIMARY_FEE_ITEMS } from '../../constants/feeItems.ts';
-import { formatWon, formatYearMonth } from '../../domain/format.ts';
-import { savePrimaryCost } from '../../services/firestore/monthRepo.ts';
+import { formatWon, formatYearMonth, parseAmountInput } from '../../domain/format.ts';
+import { isValidAmount } from '../../domain/money.ts';
+import { useDraftEntries } from '../../hooks/useDraftEntries.ts';
+import { savePrimaryCost, updateSecondary } from '../../services/firestore/monthRepo.ts';
+import { costDraftKey, isCostDraftKey, resolveCostDraftKey } from './costDraft.ts';
 import { SecondaryEditor } from './SecondaryEditor.tsx';
 import type { MonthAccess } from '../month/monthAccess.ts';
 import type { MonthDoc, MonthSummary } from '../../types/bill.ts';
@@ -22,6 +26,64 @@ interface CostEntryScreenProps {
 }
 
 export function CostEntryScreen({ db, uid, month, summary, access, onBack }: CostEntryScreenProps) {
+  const drafts = useDraftEntries(month.yearMonth, uid, isCostDraftKey);
+  const [showRestore, setShowRestore] = useState(drafts.pending.length > 0);
+
+  /** 남아 있던 입력 다시 저장 (D-2, G3) — 그사이 지워진 항목의 입력은 버린다 */
+  const restoreDraft = async () => {
+    setShowRestore(false);
+    for (const key of drafts.pending) {
+      const text = drafts.entries[key];
+      const target = resolveCostDraftKey(key, month.secondaryCategories);
+      if (text === undefined || target === null) {
+        drafts.clear(key);
+        continue;
+      }
+      if (target.kind === 'primary' || target.kind === 'itemAmount') {
+        const amount = parseAmountInput(text) ?? 0;
+        if (!isValidAmount(amount)) continue;
+        await drafts.commit(
+          key,
+          target.kind === 'primary'
+            ? savePrimaryCost(db, month.yearMonth, target.key, amount, uid)
+            : updateSecondary(
+                db,
+                month.yearMonth,
+                (latest) =>
+                  latest.map((category) =>
+                    category.id === target.categoryId
+                      ? { ...category, items: category.items.map((item) => (item.id === target.itemId ? { ...item, amount } : item)) }
+                      : category,
+                  ),
+                uid,
+              ),
+        );
+        continue;
+      }
+      const name = text.trim();
+      if (name === '') continue;
+      await drafts.commit(
+        key,
+        updateSecondary(
+          db,
+          month.yearMonth,
+          (latest) =>
+            latest.map((category) => {
+              if (category.id !== target.categoryId) return category;
+              if (target.kind === 'categoryName') return { ...category, name };
+              return { ...category, items: category.items.map((item) => (item.id === target.itemId ? { ...item, name } : item)) };
+            }),
+          uid,
+        ),
+      );
+    }
+  };
+
+  const discardDraft = () => {
+    drafts.pending.forEach(drafts.clear);
+    setShowRestore(false);
+  };
+
   return (
     <div className="min-h-screen bg-slate-100">
       <header className="flex items-center gap-4 border-b-2 border-slate-300 bg-white px-6 py-4">
@@ -36,6 +98,18 @@ export function CostEntryScreen({ db, uid, month, summary, access, onBack }: Cos
           <p role="status" className="rounded-lg border-2 border-amber-700 bg-amber-50 px-4 py-3 text-lg font-semibold text-amber-900">
             {access.reason}
           </p>
+        )}
+
+        {showRestore && (
+          <div role="alert" className="flex flex-wrap items-center gap-4 rounded-lg border-2 border-amber-600 bg-amber-50 px-4 py-3 text-lg">
+            <span className="font-semibold">저장하지 못한 입력 {drafts.pending.length}개가 남아 있습니다.</span>
+            <BigButton onClick={() => void restoreDraft()} disabled={!access.canEdit}>
+              다시 저장
+            </BigButton>
+            <BigButton variant="secondary" onClick={discardDraft}>
+              버리기
+            </BigButton>
+          </div>
         )}
 
         <section aria-labelledby="totals" className="grid grid-cols-2 gap-4 rounded-2xl border-2 border-blue-800 bg-blue-50 p-6 text-xl md:grid-cols-4">
@@ -60,10 +134,9 @@ export function CostEntryScreen({ db, uid, month, summary, access, onBack }: Cos
                 label={label}
                 value={month.primaryCosts[key]}
                 disabled={!access.canEdit}
-                onCommit={async (amount) => {
-                  const result = await savePrimaryCost(db, month.yearMonth, key, amount, uid);
-                  return result.ok ? null : result.message;
-                }}
+                draft={drafts.entries[costDraftKey.primary(key)]}
+                onDraft={(text) => drafts.set(costDraftKey.primary(key), text)}
+                onCommit={(amount) => drafts.commit(costDraftKey.primary(key), savePrimaryCost(db, month.yearMonth, key, amount, uid))}
               />
             ))}
           </div>
@@ -73,7 +146,7 @@ export function CostEntryScreen({ db, uid, month, summary, access, onBack }: Cos
           <h2 id="secondary" className="mb-4 text-2xl font-bold">
             2차 항목 (추가로 든 비용)
           </h2>
-          <SecondaryEditor db={db} uid={uid} yearMonth={month.yearMonth} categories={month.secondaryCategories} canEdit={access.canEdit} />
+          <SecondaryEditor db={db} uid={uid} yearMonth={month.yearMonth} categories={month.secondaryCategories} canEdit={access.canEdit} drafts={drafts} />
         </section>
       </main>
     </div>

@@ -200,3 +200,11 @@ describe('관리소장 — 앱이 쓰는 형태 그대로 (merge 저장)', () =>
     await assertSucceeds(updateDoc(doc(db(MANAGER), 'months', CURRENT), { 'vacant.R201': true, updatedAt: 't', updatedBy: MANAGER }));
   });
 });
+
+describe('관리소장 — 수도 칸 단위 저장 (G1)', () => {
+  it('water.{세대}.amount 필드 경로 저장은 허용, 이전 달은 거부', async () => {
+    await assertSucceeds(updateDoc(doc(db(MANAGER), 'months', CURRENT), { 'water.R201.amount': 15_000, updatedAt: 't', updatedBy: MANAGER }));
+    await assertSucceeds(updateDoc(doc(db(MANAGER), 'months', CURRENT), { 'water.R201.usage': 12, updatedAt: 't', updatedBy: MANAGER }));
+    await assertFails(updateDoc(doc(db(MANAGER), 'months', PREVIOUS), { 'water.R201.amount': 15_000 }));
+  });
+});

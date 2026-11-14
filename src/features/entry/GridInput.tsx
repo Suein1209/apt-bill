@@ -1,10 +1,11 @@
-import { useEffect, useState, type KeyboardEvent, type Ref } from 'react';
+import { useState, type KeyboardEvent, type Ref } from 'react';
+import { useDraftSync } from '../../components/useDraftSync.ts';
 
 interface GridInputProps {
   label: string;
   /** 저장된 값을 화면에 보여줄 글자 */
   value: string;
-  /** 임시저장에서 복구한 글자 (저장 전) */
+  /** 임시저장된 글자 (저장 전) */
   draft: string | undefined;
   disabled: boolean;
   align?: 'left' | 'right';
@@ -12,20 +13,14 @@ interface GridInputProps {
   inputRef: Ref<HTMLInputElement>;
   onNavigate: (event: KeyboardEvent<HTMLInputElement>) => void;
   onDraft: (text: string) => void;
-  /** 값 확정 — 실패 메시지를 돌려주면 입력을 되돌린다 */
+  /** 값 확정 — 실패 메시지를 돌려준다 (입력은 임시저장에 남는다) */
   onCommit: (text: string) => Promise<string | null>;
 }
 
 /** Grid 한 칸 — 입력은 즉시 임시저장, 칸을 떠날 때 저장 */
 export function GridInput({ label, value, draft, disabled, align = 'right', highlighted = false, inputRef, onNavigate, onDraft, onCommit }: GridInputProps) {
-  const [text, setText] = useState(draft ?? value);
-  const [dirty, setDirty] = useState(draft !== undefined && draft !== value);
+  const { text, dirty, edit, setDirty } = useDraftSync(value, draft);
   const [error, setError] = useState<string | null>(null);
-
-  // 다른 사람이 바꾼 값은 고치는 중이 아닐 때만 반영
-  useEffect(() => {
-    if (!dirty) setText(value);
-  }, [value, dirty]);
 
   const commit = async () => {
     if (!dirty) return;
@@ -46,8 +41,7 @@ export function GridInput({ label, value, draft, disabled, align = 'right', high
         disabled={disabled}
         inputMode={align === 'right' ? 'numeric' : 'text'}
         onChange={(event) => {
-          setText(event.target.value);
-          setDirty(true);
+          edit(event.target.value);
           onDraft(event.target.value);
         }}
         onFocus={(event) => event.currentTarget.select()}

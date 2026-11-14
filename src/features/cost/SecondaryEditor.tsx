@@ -12,6 +12,8 @@ import { TextInput } from '../../components/TextInput.tsx';
 import { formatWon } from '../../domain/format.ts';
 import { sum } from '../../domain/money.ts';
 import { updateSecondary } from '../../services/firestore/monthRepo.ts';
+import { costDraftKey } from './costDraft.ts';
+import type { DraftEntriesApi } from '../../hooks/useDraftEntries.ts';
 import type { SecondaryCategory, YearMonth } from '../../types/bill.ts';
 
 const NEW_CATEGORY_NAME = '새 카테고리';
@@ -23,23 +25,28 @@ interface SecondaryEditorProps {
   yearMonth: YearMonth;
   categories: readonly SecondaryCategory[];
   canEdit: boolean;
+  drafts: DraftEntriesApi;
 }
 
 type PendingDelete = { kind: 'category'; categoryId: string; name: string } | { kind: 'item'; categoryId: string; itemId: string; name: string };
 
 const newId = () => crypto.randomUUID();
 
-export function SecondaryEditor({ db, uid, yearMonth, categories, canEdit }: SecondaryEditorProps) {
+export function SecondaryEditor({ db, uid, yearMonth, categories, canEdit, drafts }: SecondaryEditorProps) {
   const [pending, setPending] = useState<PendingDelete | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  /** 변경 저장 — 실패하면 메시지 반환 */
+  /** 추가·삭제처럼 입력 칸이 없는 변경 저장 — 실패하면 메시지 표시 */
   const apply = async (mutate: (latest: SecondaryCategory[]) => SecondaryCategory[]): Promise<string | null> => {
     const result = await updateSecondary(db, yearMonth, mutate, uid);
     const message = result.ok ? null : result.message;
     setError(message);
     return message;
   };
+
+  /** 입력 칸 저장 — 임시저장과 함께 (G3) */
+  const applyField = (key: string, mutate: (latest: SecondaryCategory[]) => SecondaryCategory[]) =>
+    drafts.commit(key, updateSecondary(db, yearMonth, mutate, uid));
 
   const mapCategory = (categoryId: string, update: (category: SecondaryCategory) => SecondaryCategory) => (latest: SecondaryCategory[]) =>
     latest.map((category) => (category.id === categoryId ? update(category) : category));
@@ -66,7 +73,9 @@ export function SecondaryEditor({ db, uid, yearMonth, categories, canEdit }: Sec
                 label="카테고리 이름"
                 value={category.name}
                 disabled={!canEdit}
-                onCommit={(name) => apply(mapCategory(category.id, (latest) => ({ ...latest, name })))}
+                draft={drafts.entries[costDraftKey.categoryName(category.id)]}
+                onDraft={(text) => drafts.set(costDraftKey.categoryName(category.id), text)}
+                onCommit={(name) => applyField(costDraftKey.categoryName(category.id), mapCategory(category.id, (latest) => ({ ...latest, name })))}
               />
             </div>
             <span className="text-xl font-bold tabular-nums">{formatWon(sum(category.items.map((item) => item.amount)))}</span>
@@ -84,8 +93,13 @@ export function SecondaryEditor({ db, uid, yearMonth, categories, canEdit }: Sec
                   label="항목 이름"
                   value={item.name}
                   disabled={!canEdit}
+                  draft={drafts.entries[costDraftKey.itemName(item.id)]}
+                  onDraft={(text) => drafts.set(costDraftKey.itemName(item.id), text)}
                   onCommit={(name) =>
-                    apply(mapCategory(category.id, (latest) => ({ ...latest, items: latest.items.map((it) => (it.id === item.id ? { ...it, name } : it)) })))
+                    applyField(
+                      costDraftKey.itemName(item.id),
+                      mapCategory(category.id, (latest) => ({ ...latest, items: latest.items.map((it) => (it.id === item.id ? { ...it, name } : it)) })),
+                    )
                   }
                 />
                 <MoneyInput
@@ -93,8 +107,13 @@ export function SecondaryEditor({ db, uid, yearMonth, categories, canEdit }: Sec
                   label={`${item.name} 금액`}
                   value={item.amount}
                   disabled={!canEdit}
+                  draft={drafts.entries[costDraftKey.itemAmount(item.id)]}
+                  onDraft={(text) => drafts.set(costDraftKey.itemAmount(item.id), text)}
                   onCommit={(amount) =>
-                    apply(mapCategory(category.id, (latest) => ({ ...latest, items: latest.items.map((it) => (it.id === item.id ? { ...it, amount } : it)) })))
+                    applyField(
+                      costDraftKey.itemAmount(item.id),
+                      mapCategory(category.id, (latest) => ({ ...latest, items: latest.items.map((it) => (it.id === item.id ? { ...it, amount } : it)) })),
+                    )
                   }
                 />
                 {canEdit ? (

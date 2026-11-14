@@ -128,6 +128,21 @@ export function saveUnitField(
   );
 }
 
+/**
+ * 수도 사용량 또는 요금 한 칸만 저장 (G1) — 다른 칸의 값을 옛값으로 덮어쓰지 않는다
+ */
+export function saveWaterField(
+  db: Firestore,
+  ym: YearMonth,
+  unitId: UnitId,
+  field: keyof WaterEntry,
+  value: number,
+  uid: string,
+): Promise<Result<void>> {
+  const { updatedAt, updatedBy } = stamp(uid);
+  return run(() => updateDoc(monthRef(db, ym), new FieldPath('water', unitId, field), value, 'updatedAt', updatedAt, 'updatedBy', updatedBy));
+}
+
 /** 결산 (D-6, D-8) — 결산 시점 미납액을 확정 저장 */
 export function closeMonth(db: Firestore, ym: YearMonth, unpaid: Record<UnitId, Won>, uid: string): Promise<Result<void>> {
   const now = stamp(uid);

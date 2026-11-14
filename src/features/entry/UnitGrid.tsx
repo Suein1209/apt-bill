@@ -15,8 +15,8 @@ import {
 import { formatNumber, formatWon, formatYearMonth, isISODate, parseAmountInput, parseUsageInput, todayISODate } from '../../domain/format.ts';
 import { isValidAmount } from '../../domain/money.ts';
 import { unitLabel } from '../../domain/unitLabel.ts';
-import { createDraftStore, type DraftEntries } from '../../services/draft.ts';
-import { saveUnitField } from '../../services/firestore/monthRepo.ts';
+import { useDraftEntries } from '../../hooks/useDraftEntries.ts';
+import { saveUnitField, saveWaterField } from '../../services/firestore/monthRepo.ts';
 import { savePayment, setPaymentConfirmed } from '../../services/firestore/paymentRepo.ts';
 import { GridInput } from './GridInput.tsx';
 import { useGridKeyboard } from './useGridKeyboard.ts';
@@ -31,7 +31,16 @@ const COL_COUNT = 8;
 
 type DraftField = 'usage' | 'water' | 'base' | 'paid' | 'paidDate';
 
+/** 복구 순서 — 납부일은 납부 금액 뒤에 저장해 자동 날짜가 복구한 날짜를 덮지 않게 한다 (G1) */
+const DRAFT_FIELDS: readonly DraftField[] = ['usage', 'water', 'base', 'paid', 'paidDate'];
+
 const cellKey = (unitId: string, field: DraftField) => `${unitId}|${field}`;
+
+function parseCellKey(key: string): { unitId: string; field: DraftField } | null {
+  const [unitId, field] = key.split('|');
+  const known = DRAFT_FIELDS.find((item) => item === field);
+  return unitId && known ? { unitId, field: known } : null;
+}
 
 interface UnitGridProps {
   db: Firestore;
@@ -48,38 +57,22 @@ interface UnitGridProps {
 
 export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, access, onBack }: UnitGridProps) {
   const ym = month.yearMonth;
-  const draftStore = useMemo(() => createDraftStore(ym, uid), [ym, uid]);
   const unitIds = useMemo(() => new Set(units.map((unit) => unit.id)), [units]);
-  const [draft, setDraft] = useState<DraftEntries>(() => draftStore.read());
-  const [restored] = useState(() => Object.keys(draftStore.read()).filter((key) => unitIds.has(key.split('|')[0] ?? '')));
-  const [showRestore, setShowRestore] = useState(restored.length > 0);
+  const drafts = useDraftEntries(ym, uid, (key) => unitIds.has(parseCellKey(key)?.unitId ?? ''));
+  const draft = drafts.entries;
   const [saving, setSaving] = useState(0);
   const [lastError, setLastError] = useState<string | null>(null);
   const { register, onKeyDown } = useGridKeyboard(units.length, COL_COUNT);
   const billById = useMemo(() => new Map(bills.map((bill) => [bill.unitId, bill])), [bills]);
   const isAdmin = role === 'admin';
 
-  /** 저장 실행 + 저장 상태 표시 */
-  const track = async (task: Promise<Result<void>>): Promise<string | null> => {
+  /** 저장 실행 + 저장 상태 표시 — 결과를 그대로 돌려준다 */
+  const track = async (task: Promise<Result<void>>): Promise<Result<void>> => {
     setSaving((count) => count + 1);
     const result = await task;
     setSaving((count) => count - 1);
-    const message = result.ok ? null : `${SAVE_FAILED_PREFIX}: ${result.message}`;
-    setLastError(message);
-    return message;
-  };
-
-  const writeDraft = (key: string, text: string) => {
-    draftStore.set(key, text);
-    setDraft((current) => ({ ...current, [key]: text }));
-  };
-  const clearDraft = (key: string) => {
-    draftStore.remove(key);
-    setDraft((current) => {
-      const next = { ...current };
-      delete next[key];
-      return next;
-    });
+    setLastError(result.ok ? null : `${SAVE_FAILED_PREFIX}: ${result.message}`);
+    return result;
   };
 
   const parseWonText = (text: string): Won | null => {
@@ -87,67 +80,64 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
     return isValidAmount(amount) ? amount : null;
   };
 
-  /** 칸 하나를 저장 — 임시저장 복구에도 같은 함수를 쓴다 */
+  /**
+   * 칸 하나를 저장 — 임시저장 복구에도 같은 함수를 쓴다.
+   * 그 칸의 필드만 저장해 같은 세대의 다른 칸을 옛값으로 덮지 않는다 (G1).
+   * 성공·권한 오류면 임시저장을 지우고, 그 밖의 실패는 남겨 둔다 (G4, Design §6.1).
+   */
   const commitCell = async (unitId: string, field: DraftField, text: string): Promise<string | null> => {
-    const water = month.water[unitId] ?? { usage: 0, amount: 0 };
+    const key = cellKey(unitId, field);
     const payment = payments[unitId];
-    let message: string | null;
 
     switch (field) {
       case 'usage': {
         const usage = parseUsageInput(text);
         if (usage === null) return INVALID_USAGE_MESSAGE;
-        message = await track(saveUnitField(db, ym, 'water', unitId, { ...water, usage }, uid));
-        break;
+        return drafts.commit(key, track(saveWaterField(db, ym, unitId, 'usage', usage, uid)));
       }
       case 'water': {
         const amount = parseWonText(text);
         if (amount === null) return INVALID_AMOUNT_MESSAGE;
-        message = await track(saveUnitField(db, ym, 'water', unitId, { ...water, amount }, uid));
-        break;
+        return drafts.commit(key, track(saveWaterField(db, ym, unitId, 'amount', amount, uid)));
       }
       case 'base': {
         // 비우면 직접 수정을 지우고 자동값으로 (C-17)
-        if (text.trim() === '') {
-          message = await track(saveUnitField(db, ym, 'overrides', unitId, null, uid));
-          break;
-        }
+        if (text.trim() === '') return drafts.commit(key, track(saveUnitField(db, ym, 'overrides', unitId, null, uid)));
         const amount = parseWonText(text);
         if (amount === null) return INVALID_AMOUNT_MESSAGE;
-        message = await track(saveUnitField(db, ym, 'overrides', unitId, amount, uid));
-        break;
+        return drafts.commit(key, track(saveUnitField(db, ym, 'overrides', unitId, amount, uid)));
       }
       case 'paid': {
         const paidAmount = parseWonText(text);
         if (paidAmount === null) return INVALID_AMOUNT_MESSAGE;
-        const paidDate = payment?.paidDate ?? (paidAmount > 0 ? todayISODate() : null);
-        message = await track(savePayment(db, ym, unitId, { paidAmount, paidDate }, uid, payment === undefined));
-        break;
+        // 납부일이 비어 있고 따로 입력 중인 납부일도 없을 때만 오늘 날짜를 넣는다
+        const needsDate = !payment?.paidDate && paidAmount > 0 && draft[cellKey(unitId, 'paidDate')] === undefined;
+        return drafts.commit(key, track(savePayment(db, ym, unitId, needsDate ? { paidAmount, paidDate: todayISODate() } : { paidAmount }, uid)));
       }
       case 'paidDate': {
         const trimmed = text.trim();
         if (trimmed !== '' && !isISODate(trimmed)) return INVALID_DATE_MESSAGE;
-        message = await track(
-          savePayment(db, ym, unitId, { paidAmount: payment?.paidAmount ?? 0, paidDate: trimmed === '' ? null : trimmed }, uid, payment === undefined),
-        );
-        break;
+        return drafts.commit(key, track(savePayment(db, ym, unitId, { paidDate: trimmed === '' ? null : trimmed }, uid)));
       }
     }
-    if (!message) clearDraft(cellKey(unitId, field));
-    return message;
   };
+
+  const [showRestore, setShowRestore] = useState(drafts.pending.length > 0);
 
   const restoreDraft = async () => {
     setShowRestore(false);
-    for (const key of restored) {
-      const [unitId, field] = key.split('|');
+    const targets = drafts.pending
+      .map((key) => ({ key, cell: parseCellKey(key) }))
+      .filter((item): item is { key: string; cell: { unitId: string; field: DraftField } } => item.cell !== null)
+      .sort((a, b) => DRAFT_FIELDS.indexOf(a.cell.field) - DRAFT_FIELDS.indexOf(b.cell.field));
+    for (const { key, cell } of targets) {
       const text = draft[key];
-      if (unitId && field && text !== undefined) await commitCell(unitId, field as DraftField, text);
+      if (text !== undefined) await commitCell(cell.unitId, cell.field, text);
     }
   };
 
   const discardDraft = () => {
-    restored.forEach(clearDraft);
+    drafts.pending.forEach(drafts.clear);
     setShowRestore(false);
   };
 
@@ -173,7 +163,7 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
         )}
         {showRestore && (
           <div role="alert" className="flex flex-wrap items-center gap-4 rounded-lg border-2 border-amber-600 bg-amber-50 px-4 py-3 text-lg">
-            <span className="font-semibold">저장하지 못한 입력 {restored.length}개가 남아 있습니다.</span>
+            <span className="font-semibold">저장하지 못한 입력 {drafts.pending.length}개가 남아 있습니다.</span>
             <BigButton onClick={() => void restoreDraft()} disabled={!access.canEdit}>
               다시 저장
             </BigButton>
@@ -208,7 +198,7 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
                 const autoBase = bill.primaryShare + bill.secondaryShare + bill.water;
                 const nav = (col: number) => (event: Parameters<typeof onKeyDown>[0]) => onKeyDown(event, row, col);
                 const draftOf = (field: DraftField) => draft[cellKey(unit.id, field)];
-                const draftHandler = (field: DraftField) => (text: string) => writeDraft(cellKey(unit.id, field), text);
+                const draftHandler = (field: DraftField) => (text: string) => drafts.set(cellKey(unit.id, field), text);
                 const commitHandler = (field: DraftField) => (text: string) => commitCell(unit.id, field, text);
 
                 return (
@@ -301,7 +291,7 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
                         onKeyDown={nav(COL.fill)}
                         onClick={() =>
                           void track(
-                            savePayment(db, ym, unit.id, { paidAmount: bill.charged, paidDate: payment?.paidDate ?? todayISODate() }, uid, payment === undefined),
+                            savePayment(db, ym, unit.id, { paidAmount: bill.charged, paidDate: payment?.paidDate ?? todayISODate() }, uid),
                           )
                         }
                         className="whitespace-nowrap rounded-md border-2 border-blue-800 px-3 py-1 font-bold text-blue-900 hover:bg-blue-50 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:border-slate-300 disabled:text-slate-400"
@@ -331,7 +321,7 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
                         checked={bill.isConfirmed}
                         disabled={!isAdmin || !access.canEdit || (!bill.isTarget && bill.charged <= 0)}
                         onKeyDown={nav(COL.confirm)}
-                        onChange={(event) => void track(setPaymentConfirmed(db, ym, unit.id, event.target.checked, uid, payment === undefined))}
+                        onChange={(event) => void track(setPaymentConfirmed(db, ym, unit.id, event.target.checked, uid))}
                       />
                     </td>
                   </tr>
