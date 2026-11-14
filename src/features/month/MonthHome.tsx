@@ -16,6 +16,8 @@ import { MonthHeader } from './MonthHeader.tsx';
 import { NewMonthDialog } from './NewMonthDialog.tsx';
 import { monthAccess } from './monthAccess.ts';
 import { CostEntryScreen } from '../cost/CostEntryScreen.tsx';
+import { UnitGrid } from '../entry/UnitGrid.tsx';
+import { unitsInDong } from '../../domain/units.ts';
 import type { MonthMap } from '../../services/firestore/monthRepo.ts';
 import type { Unit, UserDoc, YearMonth } from '../../types/bill.ts';
 
@@ -57,14 +59,19 @@ export function MonthHome({ auth, db, uid, profile, units, months, monthList, cu
     return <CostEntryScreen db={db} uid={uid} month={month} summary={summary} access={access} onBack={() => setView({ kind: 'home' })} />;
   }
   if (view.kind === 'dong') {
-    // module-5: 동별 입력 Grid
     return (
-      <StatusScreen title={`${view.dong}동 입력 화면은 준비 중입니다`}>
-        <p>세대별 수도·납부 입력 화면은 다음 단계에서 만들어집니다.</p>
-        <BigButton variant="secondary" onClick={() => setView({ kind: 'home' })}>
-          홈으로
-        </BigButton>
-      </StatusScreen>
+      <UnitGrid
+        db={db}
+        uid={uid}
+        role={profile.role}
+        dong={view.dong}
+        month={month}
+        units={unitsInDong(units, view.dong)}
+        bills={bills}
+        payments={state.value.payments}
+        access={access}
+        onBack={() => setView({ kind: 'home' })}
+      />
     );
   }
 

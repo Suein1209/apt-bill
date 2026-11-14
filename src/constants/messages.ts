@@ -26,3 +26,6 @@ export const READ_ONLY_CLOSED_MESSAGE = '결산이 끝난 달입니다. 수정�
 export const READ_ONLY_MANAGER_MESSAGE = '지난 달은 볼 수만 있습니다. 수정은 관리자에게 요청해 주세요.';
 export const MASTER_MISSING_MESSAGE = '세대 목록이 아직 준비되지 않았습니다. 관리자가 먼저 로그인해야 합니다.';
 export const FIRST_MONTH_MANAGER_MESSAGE = '아직 시작된 달이 없습니다. 관리자가 첫 달을 시작해야 입력할 수 있습니다.';
+export const INVALID_USAGE_MESSAGE = '사용량은 0 이상 숫자로, 소수는 첫째 자리까지 입력해 주세요.';
+export const INVALID_DATE_MESSAGE = '날짜는 2026-11-14 처럼 입력해 주세요.';
+export const SAVE_FAILED_PREFIX = '저장하지 못했습니다';

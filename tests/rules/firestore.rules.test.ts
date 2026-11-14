@@ -180,3 +180,23 @@ describe('관리자 (U-9, U-14, D-6, D-8)', () => {
     await assertSucceeds(getDoc(doc(db(MANAGER), 'master', 'units')));
   });
 });
+
+describe('관리소장 — 앱이 쓰는 형태 그대로 (merge 저장)', () => {
+  it('처음 납부 입력(문서 없음)은 허용, 이후 merge 수정도 허용', async () => {
+    const ref = doc(db(MANAGER), 'months', CURRENT, 'payments', 'R205');
+    await assertSucceeds(
+      setDoc(ref, { paidAmount: 500, paidDate: '2026-11-12', updatedAt: 't', updatedBy: MANAGER, confirmed: false, confirmedBy: null, confirmedAt: null }, { merge: true }),
+    );
+    await assertSucceeds(setDoc(ref, { paidAmount: 700, paidDate: '2026-11-13', updatedAt: 't2', updatedBy: MANAGER }, { merge: true }));
+  });
+
+  it('납부 완료된 세대는 merge 수정도 거부', async () => {
+    await assertFails(
+      setDoc(doc(db(MANAGER), 'months', CURRENT, 'payments', 'R202'), { paidAmount: 700, updatedAt: 't2', updatedBy: MANAGER }, { merge: true }),
+    );
+  });
+
+  it('공실 체크(필드 경로 저장)는 허용', async () => {
+    await assertSucceeds(updateDoc(doc(db(MANAGER), 'months', CURRENT), { 'vacant.R201': true, updatedAt: 't', updatedBy: MANAGER }));
+  });
+});
