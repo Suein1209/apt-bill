@@ -10,3 +10,6 @@ dist-ssr
 
 # graft's local graph cache — regenerable, not committed (run `graft build`).
 /graft/
+
+# bkit 플러그인 실행 기록·상태
+.bkit/
