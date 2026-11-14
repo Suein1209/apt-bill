@@ -19,3 +19,6 @@ coverage/
 
 # Firebase 에뮬레이터 로그
 *-debug.log
+
+# Firebase CLI 배포 캐시
+.firebase/
