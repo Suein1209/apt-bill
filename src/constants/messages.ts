@@ -32,3 +32,6 @@ export const SAVE_FAILED_PREFIX = '저장하지 못했습니다';
 
 /** 납부 금액이 청구액을 넘을 때 (G-13) */
 export const paidOverChargedMessage = (charged: string) => `청구액(${charged})보다 많이 입력할 수 없습니다.`;
+
+/** 납부 확인된 세대의 수도 수정 시도 (G-18) */
+export const CONFIRMED_LOCKED_MESSAGE = '납부 확인된 세대는 수도 사용량·요금을 고칠 수 없습니다.';

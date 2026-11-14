@@ -1,19 +1,20 @@
 /**
- * 동별 입력 Grid — 공실·수도·직접 수정·납부 (Design §5.1, §5.4 동별 Grid)
+ * 동별 입력 Grid — 공실·수도·납부 (Design §5.1, §5.4 동별 Grid)
+ * 이번 달 관리비·납부일은 보기 전용, 납부 확인된 세대는 수도도 잠근다 (G-17 ~ G-19)
  * Plan SC: SC-1(키보드만으로 한 달 입력), SC-6(새로고침해도 임시저장으로 복구)
  */
 import { useMemo, useRef, useState } from 'react';
 import type { Firestore } from 'firebase/firestore';
-import { ArrowLeft, RotateCcw } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { BigButton } from '../../components/BigButton.tsx';
 import {
+  CONFIRMED_LOCKED_MESSAGE,
   INVALID_AMOUNT_MESSAGE,
-  INVALID_DATE_MESSAGE,
   INVALID_USAGE_MESSAGE,
   SAVE_FAILED_PREFIX,
   paidOverChargedMessage,
 } from '../../constants/messages.ts';
-import { formatNumber, formatWon, formatYearMonth, isISODate, parseAmountInput, parseUsageInput, todayISODate } from '../../domain/format.ts';
+import { formatNumber, formatWon, formatYearMonth, parseAmountInput, parseUsageInput, todayISODate } from '../../domain/format.ts';
 import { isValidAmount } from '../../domain/money.ts';
 import { canToggleConfirmed, exceedsCharged, isFullyPaid, paidDateFor } from '../../domain/payment.ts';
 import { unitLabel } from '../../domain/unitLabel.ts';
@@ -28,13 +29,14 @@ import type { MonthAccess } from '../month/monthAccess.ts';
 import type { MonthDoc, Unit, UnitBill, UserRole, Won } from '../../types/bill.ts';
 
 /** 키보드로 이동하는 칸의 열 번호 */
-const COL = { vacant: 0, usage: 1, water: 2, base: 3, paid: 4, fill: 5, paidDate: 6, confirm: 7 } as const;
-const COL_COUNT = 8;
+const COL = { vacant: 0, usage: 1, water: 2, paid: 3, fill: 4, confirm: 5 } as const;
+const COL_COUNT = 6;
 
-type DraftField = 'usage' | 'water' | 'base' | 'paid' | 'paidDate';
+/** 입력할 수 있는 칸 — 이번 달 관리비·납부일은 보기 전용 (G-17, G-19) */
+type DraftField = 'usage' | 'water' | 'paid';
 
-/** 복구 순서 — 납부일은 납부 금액 뒤에 저장해 자동 날짜가 복구한 날짜를 덮지 않게 한다 (G1) */
-const DRAFT_FIELDS: readonly DraftField[] = ['usage', 'water', 'base', 'paid', 'paidDate'];
+/** 복구 순서 */
+const DRAFT_FIELDS: readonly DraftField[] = ['usage', 'water', 'paid'];
 
 const cellKey = (unitId: string, field: DraftField) => `${unitId}|${field}`;
 
@@ -92,7 +94,13 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
   const commitCell = async (unitId: string, field: DraftField, text: string): Promise<string | null> => {
     const key = cellKey(unitId, field);
     const payment = payments[unitId];
-    const charged = billById.get(unitId)?.charged ?? 0;
+    const bill = billById.get(unitId);
+    const charged = bill?.charged ?? 0;
+    // 납부 확인된 세대는 수도를 고칠 수 없다 (G-18) — 임시저장 복구로 들어와도 막는다
+    if ((field === 'usage' || field === 'water') && bill?.isConfirmed) {
+      drafts.clear(key);
+      return CONFIRMED_LOCKED_MESSAGE;
+    }
 
     switch (field) {
       case 'usage': {
@@ -105,28 +113,15 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
         if (amount === null) return INVALID_AMOUNT_MESSAGE;
         return drafts.commit(key, track(saveWaterField(db, ym, unitId, 'amount', amount, uid)));
       }
-      case 'base': {
-        // 비우면 직접 수정을 지우고 자동값으로 (C-17)
-        if (text.trim() === '') return drafts.commit(key, track(saveUnitField(db, ym, 'overrides', unitId, null, uid)));
-        const amount = parseWonText(text);
-        if (amount === null) return INVALID_AMOUNT_MESSAGE;
-        return drafts.commit(key, track(saveUnitField(db, ym, 'overrides', unitId, amount, uid)));
-      }
       case 'paid': {
         const paidAmount = parseWonText(text);
         if (paidAmount === null) return INVALID_AMOUNT_MESSAGE;
         if (exceedsCharged(paidAmount, charged)) return paidOverChargedMessage(formatWon(charged));
-        // 다 내면 납부일을 넣고(기존 날짜·입력 중인 날짜 우선), 덜 내면 납부일을 지운다 (G-14)
+        // 다 내면 납부일을 넣고(기존 날짜 우선), 덜 내면 납부일을 지운다 (G-14)
         const paidDate = paidDateFor(paidAmount, charged, payment?.paidDate ?? null, todayISODate());
-        const keepDraftDate = paidDate !== null && draft[cellKey(unitId, 'paidDate')] !== undefined;
-        const saving = drafts.commit(key, track(savePayment(db, ym, unitId, keepDraftDate ? { paidAmount } : { paidAmount, paidDate }, uid)));
+        const saving = drafts.commit(key, track(savePayment(db, ym, unitId, { paidAmount, paidDate }, uid)));
         pendingPaid.current.set(unitId, saving);
         return saving;
-      }
-      case 'paidDate': {
-        const trimmed = text.trim();
-        if (trimmed !== '' && !isISODate(trimmed)) return INVALID_DATE_MESSAGE;
-        return drafts.commit(key, track(savePayment(db, ym, unitId, { paidDate: trimmed === '' ? null : trimmed }, uid)));
       }
     }
   };
@@ -197,7 +192,7 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
           <table className="w-full min-w-[1100px] border-collapse text-lg">
             <thead className="sticky top-0 bg-slate-200 text-left">
               <tr>
-                {['세대', '공실', '수도 사용량', '수도 요금', '이번 달 관리비', '이월 미납', '청구액', '납부 금액', '', '납부일', '납부 완료'].map((title, index) => (
+                {['세대', '공실', '수도 사용량', '수도 요금', '이번 달 관리비', '이월 미납', '청구액', '납부 금액', '', '납부일', '납부 확인'].map((title, index) => (
                   <th key={index} scope="col" className="whitespace-nowrap border-b-2 border-slate-400 px-2 py-2 font-bold">
                     {title}
                   </th>
@@ -216,7 +211,7 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
                 const fullyPaid = isFullyPaid(bill);
                 // 납부 완료 가능 표시는 관리자에게만 (관리소장은 납부 완료를 누를 수 없다)
                 const showConfirmReady = isAdmin && fullyPaid;
-                const canWater = access.canEdit && bill.isTarget && unit.kind === 'residential';
+                const canWater = access.canEdit && bill.isTarget && unit.kind === 'residential' && !bill.isConfirmed;
                 const autoBase = bill.primaryShare + bill.secondaryShare + bill.water;
                 const nav = (col: number) => (event: Parameters<typeof onKeyDown>[0]) => onKeyDown(event, row, col);
                 const draftOf = (field: DraftField) => draft[cellKey(unit.id, field)];
@@ -264,32 +259,10 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
                         onCommit={commitHandler('water')}
                       />
                     </td>
-                    <td className="w-40 px-1">
-                      <div className="flex items-center gap-1">
-                        <GridInput
-                          label={`${unitLabel(unit)} 이번 달 관리비`}
-                          value={bill.isTarget ? formatNumber(bill.override ?? autoBase) : ''}
-                          draft={draftOf('base')}
-                          disabled={!access.canEdit || !bill.isTarget}
-                          highlighted={bill.override !== null}
-                          inputRef={register(row, COL.base)}
-                          onNavigate={nav(COL.base)}
-                          onDraft={draftHandler('base')}
-                          onCommit={commitHandler('base')}
-                        />
-                        {bill.override !== null && access.canEdit && (
-                          <button
-                            type="button"
-                            title="자동값으로 되돌리기"
-                            aria-label={`${unitLabel(unit)} 자동값으로 되돌리기`}
-                            onClick={() => void track(saveUnitField(db, ym, 'overrides', unit.id, null, uid))}
-                            className="rounded-md border-2 border-purple-600 p-1 text-purple-700 hover:bg-purple-50 focus:outline-none focus:ring-4 focus:ring-purple-200"
-                          >
-                            <RotateCcw className="h-5 w-5" aria-hidden="true" />
-                          </button>
-                        )}
-                      </div>
-                      {bill.override !== null && <span className="text-sm font-semibold text-purple-700">✎ 직접 수정됨</span>}
+                    {/* 이번 달 관리비 — 보기 전용 (G-17) */}
+                    <td className="whitespace-nowrap px-2 text-right tabular-nums">
+                      {bill.isTarget ? formatNumber(bill.override ?? autoBase) : ''}
+                      {bill.override !== null && <span className="block text-sm font-semibold text-purple-700">✎ 직접 수정됨</span>}
                     </td>
                     <td className="whitespace-nowrap px-2 text-right tabular-nums">{bill.carryOver === 0 ? '' : formatNumber(bill.carryOver)}</td>
                     <td className="whitespace-nowrap px-2 text-right font-bold tabular-nums">{formatWon(bill.charged)}</td>
@@ -317,29 +290,18 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
                         채우기
                       </button>
                     </td>
-                    <td className="min-w-[10rem] px-1">
-                      <GridInput
-                        label={`${unitLabel(unit)} 납부일`}
-                        value={payment?.paidDate ?? ''}
-                        draft={draftOf('paidDate')}
-                        disabled={!canPay || !fullyPaid}
-                        align="left"
-                        inputRef={register(row, COL.paidDate)}
-                        onNavigate={nav(COL.paidDate)}
-                        onDraft={draftHandler('paidDate')}
-                        onCommit={commitHandler('paidDate')}
-                      />
-                    </td>
+                    {/* 납부일 — 보기 전용, 다 내면 자동으로 들어간다 (G-19) */}
+                    <td className="min-w-[8rem] whitespace-nowrap px-2 tabular-nums">{payment?.paidDate ?? ''}</td>
                     <td className="px-2 text-center">
                       {/* 다 낸 세대는 녹색 테두리 — 관리자가 납부 완료를 누를 수 있다는 표시, 관리자 화면에만 (G-15) */}
                       <div
-                        title={showConfirmReady ? '청구액을 모두 냈습니다' : undefined}
+                        title={showConfirmReady ? '청구액을 모두 냈습니다 — 납부 확인을 할 수 있습니다' : undefined}
                         className={`inline-flex rounded-lg border-4 p-1 ${showConfirmReady ? 'border-green-600 bg-green-50' : 'border-transparent'}`}
                       >
                         <input
                           ref={register(row, COL.confirm)}
                           type="checkbox"
-                          aria-label={`${unitLabel(unit)} 납부 완료`}
+                          aria-label={`${unitLabel(unit)} 납부 확인`}
                           className="h-7 w-7 accent-green-700"
                           checked={bill.isConfirmed}
                           disabled={!isAdmin || !access.canEdit || !canToggleConfirmed(bill)}
