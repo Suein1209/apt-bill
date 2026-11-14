@@ -118,7 +118,7 @@ export function CostEntryScreen({ db, uid, month, summary, access, onBack }: Cos
           </h2>
           <Stat label="기본 공통 비용 합계" value={formatWon(summary.primaryTotal)} />
           <Stat label="추가 공통 비용 합계" value={formatWon(summary.secondaryTotal)} />
-          <Stat label="부과 대상" value={`${summary.targetCount}곳`} />
+          <Stat label="부과 대상 (관리실 포함)" value={`${summary.targetCount}곳`} />
           <Stat label="세대당 금액" value={formatWon(summary.perUnitShare)} />
         </section>
 

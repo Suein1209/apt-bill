@@ -14,7 +14,7 @@ import { makeMonth, makePayment } from './fixtures.ts';
 import type { MonthDoc, UnitBill, YearMonth } from '../../types/bill.ts';
 
 const units = buildUnits();
-const ALL_TARGETS = 128; // 129 − 관리사무소
+const ALL_TARGETS = 129; // 관리실 포함 (H-26)
 
 function billOf(bills: readonly UnitBill[], unitId: string): UnitBill {
   const bill = bills.find((item) => item.unitId === unitId);
@@ -23,33 +23,33 @@ function billOf(bills: readonly UnitBill[], unitId: string): UnitBill {
 }
 
 describe('부과 대상 (H-9, H-10, C-7)', () => {
-  it('관리사무소를 뺀 128곳', () => {
+  it('관리실을 포함한 129곳 (H-26)', () => {
     expect(countTargets(units, makeMonth('2026-11'))).toBe(ALL_TARGETS);
   });
 
-  it('공실 10곳이면 118곳', () => {
+  it('공실 10곳이면 119곳', () => {
     const vacantIds = ['R201', 'R202', 'R203', 'R205', 'R206', 'R207', 'R208', 'R209', 'S102', 'SORI'];
     const month = makeMonth('2026-11', { vacant: Object.fromEntries(vacantIds.map((id) => [id, true])) });
-    expect(countTargets(units, month)).toBe(118);
+    expect(countTargets(units, month)).toBe(119);
 
     const bills = computeBills(units, month, {}, {});
     expect(billOf(bills, 'R201')).toMatchObject({ isTarget: false, charged: 0 });
-    expect(billOf(bills, 'S112')).toMatchObject({ isTarget: false, charged: 0 });
+    expect(billOf(bills, 'S112')).toMatchObject({ isTarget: true, autoPaid: true, unpaid: 0, isConfirmed: true });
   });
 });
 
 describe('균등 분배와 10원 올림 (C-3, C-5, C-9, C-11, C-13)', () => {
-  it('1차 100,000원 ÷ 128곳 → 청구 790원, 표시 781원', () => {
+  it('1차 100,000원 ÷ 129곳 → 청구 780원, 표시 775원', () => {
     const month = makeMonth('2026-11', { primaryCosts: { labor: 100_000, commonElectricity: 0, commonWater: 0, maintenance: 0 } });
     const bill = billOf(computeBills(units, month, {}, {}), 'R201');
-    expect(bill.charged).toBe(790);
-    expect(bill.primaryShare).toBe(781);
+    expect(bill.charged).toBe(780);
+    expect(bill.primaryShare).toBe(775);
   });
 
   it('1차와 2차를 합쳐 나눈다', () => {
     const month = makeMonth('2026-11', {
-      primaryCosts: { labor: 64_000, commonElectricity: 0, commonWater: 0, maintenance: 0 },
-      secondaryCategories: [{ id: 'c', name: '통신비', items: [{ id: 'i', name: '인터넷', amount: 64_000 }] }],
+      primaryCosts: { labor: 64_500, commonElectricity: 0, commonWater: 0, maintenance: 0 },
+      secondaryCategories: [{ id: 'c', name: '통신비', items: [{ id: 'i', name: '인터넷', amount: 64_500 }] }],
     });
     const bill = billOf(computeBills(units, month, {}, {}), 'S110');
     expect(bill.primaryShare).toBe(500);
@@ -57,14 +57,14 @@ describe('균등 분배와 10원 올림 (C-3, C-5, C-9, C-11, C-13)', () => {
     expect(bill.charged).toBe(1_000);
   });
 
-  it('올림은 최종 합계에서 한 번만 — 항목마다 올리면 16,100원, 최종 합계 올림은 16,090원', () => {
+  it('올림은 최종 합계에서 한 번만 — 항목마다 올리면 16,090원, 최종 합계 올림은 16,080원', () => {
     const month = makeMonth('2026-11', {
       primaryCosts: { labor: 100_000, commonElectricity: 0, commonWater: 0, maintenance: 0 },
-      water: { R201: { usage: 12, amount: 15_305 } },
+      water: { R201: { usage: 12, amount: 15_301 } },
     });
     const bill = billOf(computeBills(units, month, {}, {}), 'R201');
-    expect(bill.water).toBe(15_305);
-    expect(bill.charged).toBe(16_090); // 781.25 + 15,305 = 16,086.25 → 16,090
+    expect(bill.water).toBe(15_301);
+    expect(bill.charged).toBe(16_080); // 775.19… + 15,301 = 16,076.19… → 16,080
   });
 
   it('상가는 수도 요금을 넣어도 반영하지 않는다 (F-3)', () => {
@@ -74,27 +74,29 @@ describe('균등 분배와 10원 올림 (C-3, C-5, C-9, C-11, C-13)', () => {
 
   it('합계·세대당 분배액 (F-14, P-12)', () => {
     const month = makeMonth('2026-11', {
-      primaryCosts: { labor: 100_000, commonElectricity: 28_000, commonWater: 0, maintenance: 0 },
-      secondaryCategories: [{ id: 'c', name: '청소비', items: [{ id: 'i', name: '계단 청소', amount: 25_600 }] }],
+      primaryCosts: { labor: 100_000, commonElectricity: 29_000, commonWater: 0, maintenance: 0 },
+      secondaryCategories: [{ id: 'c', name: '청소비', items: [{ id: 'i', name: '계단 청소', amount: 25_800 }] }],
     });
     expect(summarizeMonth(units, month)).toEqual({
-      primaryTotal: 128_000,
-      secondaryTotal: 25_600,
+      primaryTotal: 129_000,
+      secondaryTotal: 25_800,
       targetCount: ALL_TARGETS,
       perUnitShare: 1_200,
     });
   });
 
-  it('모두 공실이어도 0으로 나누지 않는다', () => {
+  it('모두 공실이면 관리실 한 곳이 나누고, 나머지는 청구 0원 (H-26)', () => {
     const vacant = Object.fromEntries(units.map((unit) => [unit.id, true as const]));
     const month = makeMonth('2026-11', { vacant, primaryCosts: { labor: 10_000, commonElectricity: 0, commonWater: 0, maintenance: 0 } });
-    expect(summarizeMonth(units, month).perUnitShare).toBe(0);
-    expect(computeBills(units, month, {}, {}).every((bill) => bill.charged === 0)).toBe(true);
+    expect(summarizeMonth(units, month)).toMatchObject({ targetCount: 1, perUnitShare: 10_000 });
+    const bills = computeBills(units, month, {}, {});
+    expect(bills.filter((bill) => !bill.autoPaid).every((bill) => bill.charged === 0)).toBe(true);
+    expect(billOf(bills, 'S112')).toMatchObject({ charged: 10_000, paid: 10_000, unpaid: 0 });
   });
 });
 
 describe('직접 수정 (C-6, C-14 ~ C-17)', () => {
-  const base = { primaryCosts: { labor: 128_000, commonElectricity: 0, commonWater: 0, maintenance: 0 } };
+  const base = { primaryCosts: { labor: 129_000, commonElectricity: 0, commonWater: 0, maintenance: 0 } };
 
   it('직접 수정 30,000 + 이월 5,005 → 35,010원, 다른 세대는 그대로', () => {
     const month = makeMonth('2026-11', { ...base, overrides: { S102: 30_000 } });
@@ -115,7 +117,7 @@ describe('직접 수정 (C-6, C-14 ~ C-17)', () => {
 });
 
 describe('납부·미납 (G-8, G-10, C-8)', () => {
-  const month = makeMonth('2026-11', { primaryCosts: { labor: 128_000, commonElectricity: 0, commonWater: 0, maintenance: 0 } });
+  const month = makeMonth('2026-11', { primaryCosts: { labor: 129_000, commonElectricity: 0, commonWater: 0, maintenance: 0 } });
 
   it('일부 납부하면 차액이 미납', () => {
     const bill = billOf(computeBills(units, month, { R201: makePayment(400) }, {}), 'R201');
@@ -133,7 +135,7 @@ describe('납부·미납 (G-8, G-10, C-8)', () => {
 });
 
 describe('이월 미납 (C-8, D-9)', () => {
-  const costs = { primaryCosts: { labor: 128_000, commonElectricity: 0, commonWater: 0, maintenance: 0 } };
+  const costs = { primaryCosts: { labor: 129_000, commonElectricity: 0, commonWater: 0, maintenance: 0 } };
   const record = (ym: YearMonth, month: Partial<MonthDoc>, payments: MonthRecord['payments'] = {}): [YearMonth, MonthRecord] => [
     ym,
     { month: makeMonth(ym, month), payments },
@@ -193,7 +195,7 @@ describe('이월 미납 (C-8, D-9)', () => {
 
 describe('동 버튼 미납 현황 (G-4, G-7, G-10, G-11)', () => {
   const month = makeMonth('2026-11', {
-    primaryCosts: { labor: 128_000, commonElectricity: 0, commonWater: 0, maintenance: 0 },
+    primaryCosts: { labor: 129_000, commonElectricity: 0, commonWater: 0, maintenance: 0 },
     vacant: { R211: true },
   });
 
@@ -220,5 +222,22 @@ describe('동 전 세대 납부 완료 (G-16)', () => {
     expect(isDongFullyPaid({ dong: 1, targetCount: 15, unpaidCount: 0 })).toBe(true);
     expect(isDongFullyPaid({ dong: 1, targetCount: 15, unpaidCount: 1 })).toBe(false);
     expect(isDongFullyPaid({ dong: 1, targetCount: 0, unpaidCount: 0 })).toBe(false);
+  });
+});
+
+describe('관리실 자동 납부 (H-26)', () => {
+  const month = makeMonth('2026-11', { primaryCosts: { labor: 129_000, commonElectricity: 0, commonWater: 0, maintenance: 0 } });
+
+  it('몫은 다른 세대와 같고, 낸 것·납부 확인된 것으로 본다', () => {
+    const office = billOf(computeBills(units, month, {}, {}), 'S112');
+    expect(office).toMatchObject({ isTarget: true, autoPaid: true, charged: 1_000, paid: 1_000, unpaid: 0, isConfirmed: true });
+  });
+
+  it('결산 미납·이월·직접 수정에서 빠지고, 동 버튼 세대 수에서도 빠진다', () => {
+    const withExtras = makeMonth('2026-11', { ...month, overrides: { S112: 5_000 } });
+    const bills = computeBills(units, withExtras, {}, { S112: 3_000 });
+    expect(billOf(bills, 'S112')).toMatchObject({ override: null, carryOver: 0, unpaid: 0 });
+    expect(closingUnpaid(bills).S112).toBeUndefined();
+    expect(dongStatus(units, bills, 6)).toMatchObject({ targetCount: 15 });
   });
 });

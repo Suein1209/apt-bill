@@ -169,8 +169,10 @@ export interface PaymentDoc {
 
 export interface UnitBill {
   unitId: UnitId;
-  /** 부과 대상 여부 — 관리사무소·공실이면 false (H-9, H-10) */
+  /** 나누는 세대에 드는지 — 공실이면 false (H-10). 관리실은 true (H-9, 2026-11-14 수정) */
   isTarget: boolean;
+  /** 관리실처럼 고지·납부 없이 자동 납부로 보는 곳 (H-26) — 청구액만큼 낸 것으로, 납부 확인된 것으로 친다 */
+  autoPaid: boolean;
   /** 1차 분배액, 표시용 원 미만 버림 (C-13) */
   primaryShare: Won;
   /** 2차 분배액, 표시용 원 미만 버림 (C-13) */

@@ -24,7 +24,8 @@ export function ceilDiv(numerator: number, denominator: number): number {
   assertIntegerDivision(numerator, denominator);
   const quotient = Math.trunc(numerator / denominator);
   const remainder = numerator - quotient * denominator;
-  return remainder > 0 ? quotient + 1 : quotient;
+  const result = remainder > 0 ? quotient + 1 : quotient;
+  return result === 0 ? 0 : result; // -0 을 0 으로
 }
 
 /**

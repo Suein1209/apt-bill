@@ -32,6 +32,8 @@ import type { MonthDoc, Unit, UnitBill, UserRole, Won } from '../../types/bill.t
 const COL = { vacant: 0, usage: 1, water: 2, paid: 3, fill: 4, confirm: 5 } as const;
 const COL_COUNT = 6;
 
+const HEADERS = ['세대', '공실', '수도 사용량', '수도 요금', '이번 달 관리비', '이월 미납', '청구액', '납부 금액', '', '납부일', '납부 확인'] as const;
+
 /** 입력할 수 있는 칸 — 이번 달 관리비·납부일은 보기 전용 (G-17, G-19) */
 type DraftField = 'usage' | 'water' | 'paid';
 
@@ -192,7 +194,7 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
           <table className="w-full min-w-[1100px] border-collapse text-lg">
             <thead className="sticky top-0 bg-slate-200 text-left">
               <tr>
-                {['세대', '공실', '수도 사용량', '수도 요금', '이번 달 관리비', '이월 미납', '청구액', '납부 금액', '', '납부일', '납부 확인'].map((title, index) => (
+                {HEADERS.map((title, index) => (
                   <th key={index} scope="col" className="whitespace-nowrap border-b-2 border-slate-400 px-2 py-2 font-bold">
                     {title}
                   </th>
@@ -203,9 +205,19 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
               {units.map((unit, row) => {
                 const bill = billById.get(unit.id);
                 if (!bill) return null;
+                // 관리실은 자동 납부 — 이름만 보이고 입력·채우기·납부 확인 칸은 없다 (H-26)
+                if (bill.autoPaid) {
+                  return (
+                    <tr key={unit.id} className="border-b border-slate-200 bg-slate-100 text-slate-600">
+                      <th scope="row" className="whitespace-nowrap px-2 py-2 text-left font-bold">
+                        {unitLabel(unit)}
+                      </th>
+                      <td colSpan={HEADERS.length - 1} />
+                    </tr>
+                  );
+                }
                 const payment = payments[unit.id];
                 const water = month.water[unit.id];
-                const isOffice = unit.kind === 'office';
                 const lockedForManager = !isAdmin && bill.isConfirmed;
                 const canPay = access.canEdit && (bill.isTarget || bill.charged > 0) && !lockedForManager;
                 const fullyPaid = isFullyPaid(bill);
@@ -230,7 +242,7 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
                         aria-label={`${unitLabel(unit)} 공실`}
                         className="h-7 w-7"
                         checked={month.vacant[unit.id] === true}
-                        disabled={!access.canEdit || isOffice}
+                        disabled={!access.canEdit}
                         onKeyDown={nav(COL.vacant)}
                         onChange={(event) => void track(saveUnitField(db, ym, 'vacant', unit.id, event.target.checked ? true : null, uid))}
                       />
