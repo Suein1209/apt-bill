@@ -35,7 +35,7 @@ export function NewMonthDialog({ db, uid, yearMonth, previous, onDone, onCancel 
     <ConfirmDialog title={`${formatYearMonth(yearMonth)} 시작`} confirmLabel="시작하기" busy={busy} onConfirm={() => void handleConfirm()} onCancel={onCancel}>
       {previous ? (
         <>
-          <p>지난달의 공실 체크와 추가 공통 비용 항목(금액 포함), 안내문을 그대로 이어받습니다. 기본 공통 비용은 0원으로 시작합니다.</p>
+          <p>지난달의 공실 체크, 기본 공통 비용과 추가 공통 비용(금액 포함), 안내문을 그대로 이어받습니다. 바뀐 금액만 고치면 됩니다.</p>
           <label className="flex items-center gap-3 rounded-lg border-2 border-slate-400 p-3 text-xl font-semibold">
             <input type="checkbox" className="h-7 w-7" checked={copyWater} onChange={(event) => setCopyWater(event.target.checked)} />
             지난달 수도 사용량·요금도 복사하기

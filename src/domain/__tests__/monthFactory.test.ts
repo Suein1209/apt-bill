@@ -16,12 +16,12 @@ describe('새 달 만들기 (H-25, F-9, D-4, D-7)', () => {
     notice: '12월 소독 안내',
   });
 
-  it('공실·2차 항목(금액 포함)·안내문은 이어받고, 1차·직접 수정·결산은 새로 시작', () => {
+  it('공실·기본 공통 비용·추가 공통 비용(금액 포함)·안내문은 이어받고, 직접 수정·결산은 새로 시작 (F-16)', () => {
     const month = createMonthDoc('2026-12', previous, { copyWater: false }, NOW, 'admin');
     expect(month).toMatchObject({
       yearMonth: '2026-12',
       status: 'open',
-      primaryCosts: { labor: 0, commonElectricity: 0, commonWater: 0, maintenance: 0 },
+      primaryCosts: { labor: 500_000, commonElectricity: 10_000, commonWater: 0, maintenance: 0 },
       vacant: { R201: true },
       water: {},
       overrides: {},
@@ -30,6 +30,15 @@ describe('새 달 만들기 (H-25, F-9, D-4, D-7)', () => {
       updatedBy: 'admin',
     });
     expect(month.secondaryCategories[0]?.items[0]).toEqual({ id: 'i', name: '인터넷', amount: 33_000 });
+  });
+
+  it('첫 달은 기본 공통 비용 0원', () => {
+    expect(createMonthDoc('2026-11', null, { copyWater: false }, NOW, 'admin').primaryCosts).toEqual({
+      labor: 0,
+      commonElectricity: 0,
+      commonWater: 0,
+      maintenance: 0,
+    });
   });
 
   it('수도 복사를 고르면 사용량·요금을 복사한다', () => {
