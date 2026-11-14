@@ -20,3 +20,9 @@ export const ROLE_LABELS: Readonly<Record<UserRole, string>> = {
   admin: '관리자',
   manager: '관리소장',
 };
+
+export const INVALID_AMOUNT_MESSAGE = '0원 이상 1억 원 이하의 숫자로 입력해 주세요.';
+export const READ_ONLY_CLOSED_MESSAGE = '결산이 끝난 달입니다. 수정하려면 관리자가 결산을 취소해야 합니다.';
+export const READ_ONLY_MANAGER_MESSAGE = '지난 달은 볼 수만 있습니다. 수정은 관리자에게 요청해 주세요.';
+export const MASTER_MISSING_MESSAGE = '세대 목록이 아직 준비되지 않았습니다. 관리자가 먼저 로그인해야 합니다.';
+export const FIRST_MONTH_MANAGER_MESSAGE = '아직 시작된 달이 없습니다. 관리자가 첫 달을 시작해야 입력할 수 있습니다.';

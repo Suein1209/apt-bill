@@ -3,7 +3,7 @@ import type { Firestore } from 'firebase/firestore';
 import { firebase } from './lib/firebase.ts';
 import { useAuth } from './hooks/useAuth.ts';
 import { LoginScreen } from './components/LoginScreen.tsx';
-import { HomeScreen } from './components/HomeScreen.tsx';
+import { MonthApp } from './features/month/MonthApp.tsx';
 import { StatusScreen } from './components/StatusScreen.tsx';
 import { LogoutButton } from './components/LogoutButton.tsx';
 import { PROFILE_LOAD_FAILED_TITLE, UNREGISTERED_MESSAGE, UNREGISTERED_TITLE } from './constants/messages.ts';
@@ -58,6 +58,6 @@ function AuthGate({ auth, db }: { auth: Auth; db: Firestore }) {
         </StatusScreen>
       );
     case 'signedIn':
-      return <HomeScreen auth={auth} profile={state.profile} />;
+      return <MonthApp auth={auth} db={db} uid={state.user.uid} profile={state.profile} />;
   }
 }
