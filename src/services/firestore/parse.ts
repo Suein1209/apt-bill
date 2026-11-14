@@ -98,9 +98,10 @@ const parseTrue = (value: unknown): true | null => (value === true ? true : null
 /** 수도 사용량·요금은 칸마다 따로 저장되므로(G1) 한쪽만 있어도 읽는다 — 없는 값은 0 */
 function parseWater(value: unknown): WaterEntry | null {
   if (!isRecord(value)) return null;
-  const usage = value.usage ?? 0;
-  const amount = value.amount ?? 0;
-  if (typeof usage !== 'number' || !isInt(amount)) return null;
+  // 입력하지 않은 칸은 null 로 둔다 — 화면에 "0"으로 보이지 않게
+  const usage = value.usage ?? null;
+  const amount = value.amount ?? null;
+  if ((usage !== null && typeof usage !== 'number') || (amount !== null && !isInt(amount))) return null;
   return { usage, amount };
 }
 

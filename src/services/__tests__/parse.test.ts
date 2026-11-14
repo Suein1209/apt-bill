@@ -13,7 +13,7 @@ const base = {
 describe('월 문서 읽기', () => {
   it('수도 사용량·요금 중 한쪽만 저장돼 있어도 읽는다 (G1)', () => {
     const month = parseMonthDoc('2026-11', { ...base, water: { R201: { amount: 15_000 }, R202: { usage: 12 } } });
-    expect(month?.water).toEqual({ R201: { usage: 0, amount: 15_000 }, R202: { usage: 12, amount: 0 } });
+    expect(month?.water).toEqual({ R201: { usage: null, amount: 15_000 }, R202: { usage: 12, amount: null } });
   });
 
   it('금액이 정수가 아니면 형식 오류', () => {

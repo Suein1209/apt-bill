@@ -238,7 +238,7 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
                     <td className="w-24 px-1">
                       <GridInput
                         label={`${unitLabel(unit)} 수도 사용량`}
-                        value={water ? String(water.usage) : ''}
+                        value={water?.usage == null ? '' : String(water.usage)}
                         draft={draftOf('usage')}
                         disabled={!canWater}
                         inputRef={register(row, COL.usage)}
@@ -250,7 +250,7 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
                     <td className="w-32 px-1">
                       <GridInput
                         label={`${unitLabel(unit)} 수도 요금`}
-                        value={water ? formatNumber(water.amount) : ''}
+                        value={water?.amount == null ? '' : formatNumber(water.amount)}
                         draft={draftOf('water')}
                         disabled={!canWater}
                         inputRef={register(row, COL.water)}

@@ -112,9 +112,10 @@ export interface SecondaryCategory {
 }
 
 /** 세대별 수도 — 이번 달 사용량과 요금을 직접 입력 (F-11, F-12) */
+/** 수도 — 칸마다 따로 저장하므로 한쪽만 입력돼 있을 수 있다 (입력 안 함 = null, 요금은 계산 때 0원) */
 export interface WaterEntry {
-  usage: number;
-  amount: Won;
+  usage: number | null;
+  amount: Won | null;
 }
 
 /* ------------------------------------------------------------------ */
