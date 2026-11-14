@@ -1,5 +1,5 @@
 /**
- * 이번 달 비용 입력 — 1차 4칸 + 2차 카테고리·항목 + 합계 (F-1 ~ F-15, P-12 미리보기)
+ * 이번 달 비용 입력 — 기본 공통 비용(1차) 4칸 + 추가 공통 비용(2차) 카테고리·항목 + 합계 (F-1 ~ F-15, P-12 미리보기)
  */
 import { useState } from 'react';
 import type { Firestore } from 'firebase/firestore';
@@ -14,7 +14,7 @@ import { savePrimaryCost, updateSecondary } from '../../services/firestore/month
 import { costDraftKey, isCostDraftKey, resolveCostDraftKey } from './costDraft.ts';
 import { SecondaryEditor } from './SecondaryEditor.tsx';
 import type { MonthAccess } from '../month/monthAccess.ts';
-import type { MonthDoc, MonthSummary } from '../../types/bill.ts';
+import type { MonthDoc, MonthSummary, Won } from '../../types/bill.ts';
 
 interface CostEntryScreenProps {
   db: Firestore;
@@ -116,16 +116,14 @@ export function CostEntryScreen({ db, uid, month, summary, access, onBack }: Cos
           <h2 id="totals" className="sr-only">
             합계
           </h2>
-          <Stat label="1차 합계" value={formatWon(summary.primaryTotal)} />
-          <Stat label="2차 합계" value={formatWon(summary.secondaryTotal)} />
+          <Stat label="기본 공통 비용 합계" value={formatWon(summary.primaryTotal)} />
+          <Stat label="추가 공통 비용 합계" value={formatWon(summary.secondaryTotal)} />
           <Stat label="부과 대상" value={`${summary.targetCount}곳`} />
           <Stat label="세대당 금액" value={formatWon(summary.perUnitShare)} />
         </section>
 
         <section aria-labelledby="primary" className="rounded-2xl border-2 border-slate-300 bg-white p-6">
-          <h2 id="primary" className="mb-4 text-2xl font-bold">
-            1차 항목 (공통 비용)
-          </h2>
+          <SectionTitle id="primary" title="기본 공통 비용" total={summary.primaryTotal} />
           <div className="grid gap-5 md:grid-cols-2">
             {PRIMARY_FEE_ITEMS.map(({ key, label }) => (
               <MoneyInput
@@ -143,12 +141,24 @@ export function CostEntryScreen({ db, uid, month, summary, access, onBack }: Cos
         </section>
 
         <section aria-labelledby="secondary">
-          <h2 id="secondary" className="mb-4 text-2xl font-bold">
-            2차 항목 (추가로 든 비용)
-          </h2>
+          <SectionTitle id="secondary" title="추가 공통 비용" total={summary.secondaryTotal} />
           <SecondaryEditor db={db} uid={uid} yearMonth={month.yearMonth} categories={month.secondaryCategories} canEdit={access.canEdit} drafts={drafts} />
         </section>
       </main>
+    </div>
+  );
+}
+
+/** 구역 제목과 그 바로 아래 합계 */
+function SectionTitle({ id, title, total }: { id: string; title: string; total: Won }) {
+  return (
+    <div className="mb-4">
+      <h2 id={id} className="text-2xl font-bold">
+        {title}
+      </h2>
+      <p className="mt-1 text-xl text-slate-800">
+        합계 <strong className="tabular-nums">{formatWon(total)}</strong>
+      </p>
     </div>
   );
 }
