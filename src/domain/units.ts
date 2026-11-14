@@ -1,6 +1,6 @@
 /**
  * 부과 단위 마스터 생성
- * Design Ref: §3.5 — 2~8층 126호는 규칙으로, 1층 21곳은 고정 목록으로 만든다 (H-16 ~ H-23)
+ * Design Ref: §3.5 — 2~8층(4층 없음) 108호는 규칙으로, 1층 21곳은 고정 목록으로 만든다 (H-16 ~ H-23)
  */
 import {
   DONG_COUNT,
@@ -73,7 +73,7 @@ function buildFirstFloorUnits(): Unit[] {
   });
 }
 
-/** 부과 단위 147곳을 동·호수 순으로 만든다 (P-13 정렬) */
+/** 부과 단위 129곳을 동·호수 순으로 만든다 (P-13 정렬) */
 export function buildUnits(): Unit[] {
   return [...buildFirstFloorUnits(), ...buildResidentialUnits()].sort((a, b) => a.sortKey - b.sortKey);
 }

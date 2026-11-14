@@ -13,7 +13,7 @@ import { makeMonth, makePayment } from './fixtures.ts';
 import type { MonthDoc, UnitBill, YearMonth } from '../../types/bill.ts';
 
 const units = buildUnits();
-const ALL_TARGETS = 146; // 147 − 관리사무소
+const ALL_TARGETS = 128; // 129 − 관리사무소
 
 function billOf(bills: readonly UnitBill[], unitId: string): UnitBill {
   const bill = bills.find((item) => item.unitId === unitId);
@@ -22,14 +22,14 @@ function billOf(bills: readonly UnitBill[], unitId: string): UnitBill {
 }
 
 describe('부과 대상 (H-9, H-10, C-7)', () => {
-  it('관리사무소를 뺀 146곳', () => {
+  it('관리사무소를 뺀 128곳', () => {
     expect(countTargets(units, makeMonth('2026-11'))).toBe(ALL_TARGETS);
   });
 
-  it('공실 10곳이면 136곳', () => {
+  it('공실 10곳이면 118곳', () => {
     const vacantIds = ['R201', 'R202', 'R203', 'R205', 'R206', 'R207', 'R208', 'R209', 'S102', 'SORI'];
     const month = makeMonth('2026-11', { vacant: Object.fromEntries(vacantIds.map((id) => [id, true])) });
-    expect(countTargets(units, month)).toBe(136);
+    expect(countTargets(units, month)).toBe(118);
 
     const bills = computeBills(units, month, {}, {});
     expect(billOf(bills, 'R201')).toMatchObject({ isTarget: false, charged: 0 });
@@ -38,17 +38,17 @@ describe('부과 대상 (H-9, H-10, C-7)', () => {
 });
 
 describe('균등 분배와 10원 올림 (C-3, C-5, C-9, C-11, C-13)', () => {
-  it('1차 100,000원 ÷ 146곳 → 청구 690원, 표시 684원', () => {
+  it('1차 100,000원 ÷ 128곳 → 청구 790원, 표시 781원', () => {
     const month = makeMonth('2026-11', { primaryCosts: { labor: 100_000, commonElectricity: 0, commonWater: 0, maintenance: 0 } });
     const bill = billOf(computeBills(units, month, {}, {}), 'R201');
-    expect(bill.charged).toBe(690);
-    expect(bill.primaryShare).toBe(684);
+    expect(bill.charged).toBe(790);
+    expect(bill.primaryShare).toBe(781);
   });
 
   it('1차와 2차를 합쳐 나눈다', () => {
     const month = makeMonth('2026-11', {
-      primaryCosts: { labor: 73_000, commonElectricity: 0, commonWater: 0, maintenance: 0 },
-      secondaryCategories: [{ id: 'c', name: '통신비', items: [{ id: 'i', name: '인터넷', amount: 73_000 }] }],
+      primaryCosts: { labor: 64_000, commonElectricity: 0, commonWater: 0, maintenance: 0 },
+      secondaryCategories: [{ id: 'c', name: '통신비', items: [{ id: 'i', name: '인터넷', amount: 64_000 }] }],
     });
     const bill = billOf(computeBills(units, month, {}, {}), 'S110');
     expect(bill.primaryShare).toBe(500);
@@ -56,14 +56,14 @@ describe('균등 분배와 10원 올림 (C-3, C-5, C-9, C-11, C-13)', () => {
     expect(bill.charged).toBe(1_000);
   });
 
-  it('올림은 최종 합계에서 한 번만 — 항목마다 올리면 15,995원, 최종 합계 올림은 15,990원', () => {
+  it('올림은 최종 합계에서 한 번만 — 항목마다 올리면 16,100원, 최종 합계 올림은 16,090원', () => {
     const month = makeMonth('2026-11', {
       primaryCosts: { labor: 100_000, commonElectricity: 0, commonWater: 0, maintenance: 0 },
       water: { R201: { usage: 12, amount: 15_305 } },
     });
     const bill = billOf(computeBills(units, month, {}, {}), 'R201');
     expect(bill.water).toBe(15_305);
-    expect(bill.charged).toBe(15_990); // 684.93… + 15,305 = 15,989.93… → 15,990
+    expect(bill.charged).toBe(16_090); // 781.25 + 15,305 = 16,086.25 → 16,090
   });
 
   it('상가는 수도 요금을 넣어도 반영하지 않는다 (F-3)', () => {
@@ -73,12 +73,12 @@ describe('균등 분배와 10원 올림 (C-3, C-5, C-9, C-11, C-13)', () => {
 
   it('합계·세대당 분배액 (F-14, P-12)', () => {
     const month = makeMonth('2026-11', {
-      primaryCosts: { labor: 100_000, commonElectricity: 46_000, commonWater: 0, maintenance: 0 },
-      secondaryCategories: [{ id: 'c', name: '청소비', items: [{ id: 'i', name: '계단 청소', amount: 29_200 }] }],
+      primaryCosts: { labor: 100_000, commonElectricity: 28_000, commonWater: 0, maintenance: 0 },
+      secondaryCategories: [{ id: 'c', name: '청소비', items: [{ id: 'i', name: '계단 청소', amount: 25_600 }] }],
     });
     expect(summarizeMonth(units, month)).toEqual({
-      primaryTotal: 146_000,
-      secondaryTotal: 29_200,
+      primaryTotal: 128_000,
+      secondaryTotal: 25_600,
       targetCount: ALL_TARGETS,
       perUnitShare: 1_200,
     });
@@ -93,7 +93,7 @@ describe('균등 분배와 10원 올림 (C-3, C-5, C-9, C-11, C-13)', () => {
 });
 
 describe('직접 수정 (C-6, C-14 ~ C-17)', () => {
-  const base = { primaryCosts: { labor: 146_000, commonElectricity: 0, commonWater: 0, maintenance: 0 } };
+  const base = { primaryCosts: { labor: 128_000, commonElectricity: 0, commonWater: 0, maintenance: 0 } };
 
   it('직접 수정 30,000 + 이월 5,005 → 35,010원, 다른 세대는 그대로', () => {
     const month = makeMonth('2026-11', { ...base, overrides: { S102: 30_000 } });
@@ -114,7 +114,7 @@ describe('직접 수정 (C-6, C-14 ~ C-17)', () => {
 });
 
 describe('납부·미납 (G-8, G-10, C-8)', () => {
-  const month = makeMonth('2026-11', { primaryCosts: { labor: 146_000, commonElectricity: 0, commonWater: 0, maintenance: 0 } });
+  const month = makeMonth('2026-11', { primaryCosts: { labor: 128_000, commonElectricity: 0, commonWater: 0, maintenance: 0 } });
 
   it('일부 납부하면 차액이 미납', () => {
     const bill = billOf(computeBills(units, month, { R201: makePayment(400) }, {}), 'R201');
@@ -132,7 +132,7 @@ describe('납부·미납 (G-8, G-10, C-8)', () => {
 });
 
 describe('이월 미납 (C-8, D-9)', () => {
-  const costs = { primaryCosts: { labor: 146_000, commonElectricity: 0, commonWater: 0, maintenance: 0 } };
+  const costs = { primaryCosts: { labor: 128_000, commonElectricity: 0, commonWater: 0, maintenance: 0 } };
   const record = (ym: YearMonth, month: Partial<MonthDoc>, payments: MonthRecord['payments'] = {}): [YearMonth, MonthRecord] => [
     ym,
     { month: makeMonth(ym, month), payments },
@@ -192,7 +192,7 @@ describe('이월 미납 (C-8, D-9)', () => {
 
 describe('동 버튼 미납 현황 (G-4, G-7, G-10, G-11)', () => {
   const month = makeMonth('2026-11', {
-    primaryCosts: { labor: 146_000, commonElectricity: 0, commonWater: 0, maintenance: 0 },
+    primaryCosts: { labor: 128_000, commonElectricity: 0, commonWater: 0, maintenance: 0 },
     vacant: { R211: true },
   });
 
@@ -204,12 +204,12 @@ describe('동 버튼 미납 현황 (G-4, G-7, G-10, G-11)', () => {
     };
     const bills = computeBills(units, month, payments, {});
     // 6동 = 주거 14 + 상가 111-2·111-1·오리집 3 = 17
-    expect(dongStatus(units, bills, 6)).toEqual({ dong: 6, targetCount: 17, unpaidCount: 16 });
+    expect(dongStatus(units, bills, 6)).toEqual({ dong: 6, targetCount: 15, unpaidCount: 14 });
   });
 
   it('5동: 공실(211호)은 세지 않는다', () => {
     const bills = computeBills(units, month, {}, {});
     // 5동 = 주거 14 − 공실 1 + 상가 110·오리집 2 = 15
-    expect(dongStatus(units, bills, 5)).toEqual({ dong: 5, targetCount: 15, unpaidCount: 15 });
+    expect(dongStatus(units, bills, 5)).toEqual({ dong: 5, targetCount: 13, unpaidCount: 13 });
   });
 });

@@ -5,7 +5,8 @@
 import type { UnitKind } from '../types/bill.ts';
 
 export const DONG_COUNT = 9;
-export const RESIDENTIAL_FLOORS = [2, 3, 4, 5, 6, 7, 8] as const;
+/** 주거 층 — 4층은 없다 (H-18, 2026-11-14 납부 내역서로 확인) */
+export const RESIDENTIAL_FLOORS = [2, 3, 5, 6, 7, 8] as const;
 export const ROOMS_PER_DONG_PER_FLOOR = 2;
 export const FIRST_FLOOR = 1;
 
@@ -54,4 +55,4 @@ export const FIRST_FLOOR_UNITS: readonly FirstFloorUnitSpec[] = [
 export const RESIDENTIAL_ID_PREFIX = 'R';
 
 /** master/units 스키마 버전 */
-export const MASTER_UNITS_VERSION = 1;
+export const MASTER_UNITS_VERSION = 2;

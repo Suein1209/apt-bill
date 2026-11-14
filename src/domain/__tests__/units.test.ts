@@ -8,10 +8,14 @@ const hoOf = (dong: number, floor: number) =>
     .map((unit) => unit.ho);
 
 describe('부과 단위 마스터 (H-16 ~ H-23)', () => {
-  it('전체 147곳 = 주거 126 + 1층 21', () => {
-    expect(units).toHaveLength(147);
-    expect(units.filter((unit) => unit.kind === 'residential')).toHaveLength(126);
+  it('전체 129곳 = 주거 108 + 1층 21', () => {
+    expect(units).toHaveLength(129);
+    expect(units.filter((unit) => unit.kind === 'residential')).toHaveLength(108);
     expect(units.filter((unit) => unit.floor === 1)).toHaveLength(21);
+  });
+
+  it('4층이 없다 (H-18)', () => {
+    expect(units.some((unit) => unit.floor === 4)).toBe(false);
   });
 
   it('ID가 겹치지 않는다', () => {
@@ -29,12 +33,12 @@ describe('부과 단위 마스터 (H-16 ~ H-23)', () => {
     expect(hoOf(2, 2)).toEqual(['203', '205']);
     expect(hoOf(7, 2)).toEqual(['215', '216']);
     expect(hoOf(9, 8)).toEqual(['819', '820']);
-    expect(hoOf(4, 4)).toEqual(['408', '409']);
+    expect(hoOf(4, 5)).toEqual(['508', '509']);
   });
 
-  it('각 동은 2~8층 14호', () => {
+  it('각 동은 2~8층(4층 없음) 12호', () => {
     for (let dong = 1; dong <= 9; dong += 1) {
-      expect(unitsInDong(units, dong).filter((unit) => unit.kind === 'residential')).toHaveLength(14);
+      expect(unitsInDong(units, dong).filter((unit) => unit.kind === 'residential')).toHaveLength(12);
     }
   });
 
