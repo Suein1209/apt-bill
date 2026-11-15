@@ -191,6 +191,8 @@ export interface UnitBill {
   override: Won | null;
   /** 이월 미납 (C-8). 초과 납부면 음수 */
   carryOver: Won;
+  /** 이월 미납에 들어간 연체료 — 지난달 미납 × 10%, 1원 자리 올림 (C-16) */
+  lateFee: Won;
   /** 최종 청구액 — 최종 합계에서 한 번만 10원 올림 (C-5, C-11) */
   charged: Won;
   paid: Won;

@@ -1,6 +1,9 @@
 /** 금액 올림 단위 — 세대 최종 합계를 10원 단위로 올림 (C-5) */
 export const ROUNDING_UNIT_WON = 10;
 
+/** 연체료 비율(%) — 지난달 미납액에 더해 이월한다 (C-16) */
+export const LATE_FEE_PERCENT = 10;
+
 /** 입력 가능한 금액 상한 (Design §7) */
 export const MAX_AMOUNT_WON = 100_000_000;
 

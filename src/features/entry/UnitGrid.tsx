@@ -8,6 +8,7 @@ import { useMemo, useState } from 'react';
 import type { Firestore } from 'firebase/firestore';
 import { ArrowLeft } from 'lucide-react';
 import { BigButton } from '../../components/BigButton.tsx';
+import { LATE_FEE_PERCENT } from '../../constants/app.ts';
 import {
   CONFIRMED_LOCKED_MESSAGE,
   INVALID_USAGE_MESSAGE,
@@ -261,7 +262,15 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
                       {bill.isTarget ? formatNumber(bill.override ?? autoBase) : ''}
                       {bill.override !== null && <span className="block text-sm font-semibold text-purple-700">✎ 직접 수정됨</span>}
                     </td>
-                    <td className="whitespace-nowrap px-2 text-right tabular-nums">{bill.carryOver === 0 ? '' : formatNumber(bill.carryOver)}</td>
+                    {/* 이월 미납 — 연체료 포함 금액, 아랫줄에 연체료 (C-16) */}
+                    <td className="whitespace-nowrap px-2 text-right tabular-nums">
+                      {bill.carryOver === 0 ? '' : formatNumber(bill.carryOver)}
+                      {bill.lateFee > 0 && (
+                        <span className="block text-base font-semibold text-red-800/75">
+                          연체 {LATE_FEE_PERCENT}% {formatNumber(bill.lateFee)}
+                        </span>
+                      )}
+                    </td>
                     <td className="whitespace-nowrap px-2 text-right font-bold tabular-nums">{formatWon(bill.charged)}</td>
                     {/* 납부 상태 — 미납↔완납 토글 (G-20) */}
                     <td className="px-1 text-center">

@@ -6,6 +6,7 @@ import {
   countTargets,
   dongStatus,
   isDongFullyPaid,
+  lateFeeOf,
   perShare,
   summarizeMonth,
   waterFee,
@@ -83,10 +84,10 @@ describe('균등 분배와 10원 올림 (C-3, C-5, C-9, C-11, C-13)', () => {
 describe('직접 수정 (C-6, C-14 ~ C-17)', () => {
   const base = { primaryCosts: { labor: 129_000, commonElectricity: 0, commonWater: 0, maintenance: 0 } };
 
-  it('직접 수정 30,000 + 이월 5,005 → 35,010원, 다른 세대는 그대로', () => {
+  it('직접 수정 30,000 + 이월 5,515(미납 5,005 + 연체 510) → 35,520원, 다른 세대는 그대로', () => {
     const month = makeMonth('2026-11', { ...base, overrides: { S102: 30_000 } });
     const bills = computeBills(units, month, {}, { S102: 5_005 });
-    expect(billOf(bills, 'S102')).toMatchObject({ override: 30_000, charged: 35_010 });
+    expect(billOf(bills, 'S102')).toMatchObject({ override: 30_000, carryOver: 5_515, lateFee: 510, charged: 35_520 });
     expect(billOf(bills, 'R201').charged).toBe(1_000);
   });
 
@@ -136,8 +137,8 @@ describe('이월 미납 (C-8, D-9)', () => {
       record('2026-10', costs, { R201: makePayment(500) }),
     ]);
     const carry = computeCarryOvers(units, '2026-11', history);
-    // 10월 R201: 1,000(분배) + 1,000(9월 이월) = 2,000 청구, 500 납부 → 1,500
-    expect(carry.R201).toBe(1_500);
+    // 10월 R201: 1,000(분배) + 1,100(9월 미납 1,000 + 연체 100) = 2,100 청구, 500 납부 → 1,600
+    expect(carry.R201).toBe(1_600);
     expect(carry.R202).toBe(1_000);
     expect(carry.S112).toBeUndefined();
   });
@@ -145,8 +146,8 @@ describe('이월 미납 (C-8, D-9)', () => {
   it('결산 전 이전 달 납부를 고치면 다음 달 이월이 바뀐다 (D-9)', () => {
     const closed = record('2026-09', { status: 'closed', closing: { closedAt: '', closedBy: 'admin', unpaid: { R201: 1_000 } } });
     const before = new Map([closed, record('2026-10', costs, { R201: makePayment(500) })]);
-    const after = new Map([closed, record('2026-10', costs, { R201: makePayment(2_000) })]);
-    expect(computeCarryOvers(units, '2026-11', before).R201).toBe(1_500);
+    const after = new Map([closed, record('2026-10', costs, { R201: makePayment(2_100) })]);
+    expect(computeCarryOvers(units, '2026-11', before).R201).toBe(1_600);
     expect(computeCarryOvers(units, '2026-11', after).R201).toBeUndefined();
   });
 
@@ -163,8 +164,8 @@ describe('이월 미납 (C-8, D-9)', () => {
       record('2026-09', costs),
       record('2026-10', costs),
     ]);
-    // 9월 미납 1,000 → 10월 청구 2,000 → 11월 이월 2,000
-    expect(computeCarryOvers(units, '2026-11', history).R201).toBe(2_000);
+    // 9월 미납 1,000 → 10월 청구 1,000 + 1,100(연체 포함) = 2,100 → 11월로 넘어가는 미납 2,100
+    expect(computeCarryOvers(units, '2026-11', history).R201).toBe(2_100);
   });
 
   it('초과 납부(음수 이월)는 다음 달 청구에서 차감된다 (Design §12 Q2)', () => {
@@ -174,10 +175,31 @@ describe('이월 미납 (C-8, D-9)', () => {
 
   it('공실에도 이전 미납은 청구된다 (Design §12 Q4)', () => {
     const month = makeMonth('2026-11', { ...costs, vacant: { R201: true } });
-    expect(billOf(computeBills(units, month, {}, { R201: 1_234 }), 'R201')).toMatchObject({ isTarget: false, charged: 1_240 });
+    // 1,234 + 연체 130(123.4 → 1원 자리 올림) = 1,364 → 1,370
+    expect(billOf(computeBills(units, month, {}, { R201: 1_234 }), 'R201')).toMatchObject({ isTarget: false, carryOver: 1_364, charged: 1_370 });
   });
 });
 
+describe('연체료 10% (C-16)', () => {
+  const costs = { primaryCosts: { labor: 129_000, commonElectricity: 0, commonWater: 0, maintenance: 0 } };
+
+  it('지난달 미납액의 10%를 1원 자리 올림해 이월 미납에 더한다', () => {
+    expect(lateFeeOf(10_000)).toBe(1_000);
+    expect(lateFeeOf(1_234)).toBe(130);
+    const bill = billOf(computeBills(units, makeMonth('2026-11', costs), {}, { R201: 10_000 }), 'R201');
+    expect(bill).toMatchObject({ carryOver: 11_000, lateFee: 1_000, charged: 12_000 });
+  });
+
+  it('미납이 없거나 더 낸 경우(음수 이월)에는 연체료가 없다', () => {
+    expect(lateFeeOf(0)).toBe(0);
+    expect(lateFeeOf(-1_000)).toBe(0);
+    expect(billOf(computeBills(units, makeMonth('2026-11', costs), {}, { R201: -1_000 }), 'R201')).toMatchObject({ carryOver: -1_000, lateFee: 0 });
+  });
+
+  it('관리실에는 연체료가 붙지 않는다 (H-26)', () => {
+    expect(billOf(computeBills(units, makeMonth('2026-11', costs), {}, { S112: 5_000 }), 'S112')).toMatchObject({ carryOver: 0, lateFee: 0 });
+  });
+});
 
 describe('동 버튼 미납 현황 (G-4, G-7, G-10, G-11)', () => {
   const month = makeMonth('2026-11', {

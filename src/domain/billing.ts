@@ -3,6 +3,7 @@
  * Design Ref: §3.4 — 저장된 입력값으로 분배·청구·이월을 매번 계산한다
  * Plan SC: SC-2(계산 규칙 일치), SC-5(이전 달 수정 → 이월 자동 반영)
  */
+import { LATE_FEE_PERCENT } from '../constants/app.ts';
 import { WATER_RATE_KEY } from '../constants/feeItems.ts';
 import { ceilToUnit, ceilWon, sum } from './money.ts';
 import { prevYearMonth } from './yearMonth.ts';
@@ -131,8 +132,14 @@ function waterAmount(unit: Unit, month: MonthDoc): Won {
   return unit.kind === 'residential' ? waterFee(month.water[unit.id]?.usage ?? null, month) : 0;
 }
 
+/** 연체료 = 지난달 미납액 × 10%, 1원 자리 올림. 미납이 없거나 더 낸 경우(음수)는 0원 (C-16) */
+export function lateFeeOf(previousUnpaid: Won): Won {
+  return previousUnpaid > 0 ? ceilToUnit(previousUnpaid * LATE_FEE_PERCENT, 100) : 0;
+}
+
 /**
  * 그 달 모든 부과 단위의 청구액을 계산한다.
+ * carryOvers는 지난달 미납액(연체료 전)이다 — 여기서 연체료를 더해 이월 미납을 만든다 (C-16).
  *
  * 부과 대상 u (몫 w = shareCount, 오리집 2·나머지 1):
  *   직접 수정 있음  charged = ceil10(override + carry)                              (C-14, C-15)
@@ -140,6 +147,8 @@ function waterAmount(unit: Unit, month: MonthDoc): Won {
  *   share = Σ ceil10(인건비·공동 전기요금·유지비 ÷ N) — 세대당 금액, 화면 표시와 같은 값 (F-19)
  *           수도 단가 줄 금액과 유지비 지출 내역은 나누지 않는다                    (F-17, F-18)
  *   water = 사용량 × 리터당 단가(1원 자리 올림), 1원 자리 올림                      (F-17, F-19)
+ *   carry = 지난달 미납 + 연체료(지난달 미납 × 10%, 1원 자리 올림)                   (C-16)
+ *           연체료가 붙은 이월도 또 미납되면 다음 달에 그 전체에 다시 10%가 붙는다
  * 부과 대상 아님(공실): 이번 달 관리비 없이 이월 미납만 청구                     (Design §12 Q4)
  * 관리실: 나누지도 내지도 않는다. 청구·이월·직접 수정 없음                         (H-26)
  */
@@ -155,7 +164,9 @@ export function computeBills(
   return units.map((unit) => {
     const exempt = isExempt(unit);
     const shares = shareCount(unit);
-    const carryOver = exempt ? 0 : (carryOvers[unit.id] ?? 0);
+    const previousUnpaid = exempt ? 0 : (carryOvers[unit.id] ?? 0);
+    const lateFee = lateFeeOf(previousUnpaid);
+    const carryOver = previousUnpaid + lateFee;
     const payment = payments[unit.id];
     const isTarget = isBillingTarget(unit, month) && targetCount > 0;
     const override = isTarget && !exempt ? (month.overrides[unit.id] ?? null) : null;
@@ -180,6 +191,7 @@ export function computeBills(
       water,
       override,
       carryOver,
+      lateFee,
       charged,
       paid,
       unpaid: charged - paid,
