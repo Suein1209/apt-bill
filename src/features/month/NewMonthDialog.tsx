@@ -40,13 +40,13 @@ export function NewMonthDialog({ db, uid, yearMonth, previous, previousBills, on
     <ConfirmDialog title={`${formatYearMonth(yearMonth)} 시작`} confirmLabel="시작하기" busy={busy} onConfirm={() => void handleConfirm()} onCancel={onCancel}>
       {previous ? (
         <>
-          <p>지난달의 공실 체크, 공용 비용(수도 총 사용량 포함)과 유지비 지출 내역(금액 포함), 안내문을 그대로 이어받습니다. 바뀐 금액만 고치면 됩니다.</p>
+          <p>지난달의 공실 체크, 공용 비용(수도량 제외)과 유지비 지출 내역(금액 포함), 안내문을 그대로 이어받습니다. 바뀐 금액만 고치면 됩니다.</p>
           {previous.status === 'open' && previousBills && (
             <p className="font-semibold text-red-700">{formatYearMonth(previous.yearMonth)}은 지금 미납액으로 함께 결산 완료됩니다.</p>
           )}
           <label className="flex items-center gap-3 rounded-lg border-2 border-slate-400 p-3 text-xl font-semibold">
             <input type="checkbox" className="h-7 w-7" checked={copyWater} onChange={(event) => setCopyWater(event.target.checked)} />
-            지난달 세대별 수도 사용량도 복사하기
+            지난달 수도도 복사하기 (수도량 금액·총 리터, 세대별 사용량)
           </label>
         </>
       ) : (

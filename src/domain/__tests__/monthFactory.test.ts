@@ -42,9 +42,17 @@ describe('새 달 만들기 (H-25, F-9, D-4, D-7)', () => {
     });
   });
 
-  it('세대별 수도 사용량은 복사를 고를 때만, 수도 총 사용량은 항상 이어받는다 (F-17)', () => {
-    expect(createMonthDoc('2026-12', previous, { copyWater: true }, NOW, 'admin').water).toEqual({ R202: { usage: 12 } });
-    expect(createMonthDoc('2026-12', previous, { copyWater: false }, NOW, 'admin').waterTotalUsage).toBe(4_000);
+  it('수도 복사를 고르면 세대별 사용량·수도량 금액·총 사용량을 이어받고, 안 고르면 비운다 (D-7, F-17)', () => {
+    const withWater = { ...previous, primaryCosts: { ...previous.primaryCosts, commonWater: 30_000 } };
+    const copied = createMonthDoc('2026-12', withWater, { copyWater: true }, NOW, 'admin');
+    expect(copied.water).toEqual({ R202: { usage: 12 } });
+    expect(copied.primaryCosts.commonWater).toBe(30_000);
+    expect(copied.waterTotalUsage).toBe(4_000);
+
+    const fresh = createMonthDoc('2026-12', withWater, { copyWater: false }, NOW, 'admin');
+    expect(fresh.water).toEqual({});
+    expect(fresh.primaryCosts).toEqual({ ...withWater.primaryCosts, commonWater: 0 });
+    expect(fresh.waterTotalUsage).toBeNull();
   });
 
   it('지난달 문서를 바꾸지 않는다 (복사본)', () => {

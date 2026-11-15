@@ -2,11 +2,11 @@
  * 새 달 문서 만들기 — 지난달에서 무엇을 이어받는지 (H-25, F-9, F-16, D-4, D-7)
  * Design Ref: §4.1 startNewMonth
  */
-import { DEFAULT_SECONDARY_CATEGORIES, EMPTY_PRIMARY_COSTS } from '../constants/feeItems.ts';
+import { DEFAULT_SECONDARY_CATEGORIES, EMPTY_PRIMARY_COSTS, WATER_RATE_KEY } from '../constants/feeItems.ts';
 import type { ISODateTime, MonthDoc, SecondaryCategory, YearMonth } from '../types/bill.ts';
 
 export interface NewMonthOptions {
-  /** 지난달 세대별 수도 사용량·요금 복사 (D-7) */
+  /** 지난달 수도 복사 — 세대별 사용량, 수도량 줄의 금액·총 사용량(리터) (D-7) */
   copyWater: boolean;
 }
 
@@ -15,7 +15,8 @@ function cloneCategories(categories: readonly SecondaryCategory[]): SecondaryCat
 }
 
 /**
- * 이어받음: 공실 체크, 공용 비용 금액·수도 총 사용량, 유지비 지출 내역 카테고리·항목(금액 포함), 안내문, (선택) 세대별 수도 사용량
+ * 이어받음: 공실 체크, 공용 비용 금액(수도량 제외), 유지비 지출 내역 카테고리·항목(금액 포함), 안내문
+ * 수도 복사를 고를 때만: 세대별 수도 사용량, 수도량 줄의 금액·총 사용량 — 고르지 않으면 0원·빈칸으로 시작
  * 새로 시작: 직접 수정 없음, 결산 없음
  * 첫 달(previous = null): 공용 비용 0원, 유지비 지출 내역 기본 카테고리 (F-6)
  */
@@ -26,14 +27,17 @@ export function createMonthDoc(
   now: ISODateTime,
   uid: string,
 ): MonthDoc {
+  const copyWater = options.copyWater && previous !== null;
+  const primaryCosts = { ...(previous?.primaryCosts ?? EMPTY_PRIMARY_COSTS) };
+  if (!copyWater) primaryCosts[WATER_RATE_KEY] = 0;
   return {
     yearMonth,
     status: 'open',
-    primaryCosts: { ...(previous?.primaryCosts ?? EMPTY_PRIMARY_COSTS) },
+    primaryCosts,
     secondaryCategories: cloneCategories(previous?.secondaryCategories ?? DEFAULT_SECONDARY_CATEGORIES),
     vacant: { ...(previous?.vacant ?? {}) },
-    water: options.copyWater && previous ? structuredClone(previous.water) : {},
-    waterTotalUsage: previous?.waterTotalUsage ?? null,
+    water: copyWater ? structuredClone(previous.water) : {},
+    waterTotalUsage: copyWater ? previous.waterTotalUsage : null,
     overrides: {},
     notice: previous?.notice ?? '',
     closing: null,

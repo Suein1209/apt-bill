@@ -142,7 +142,7 @@ export function CostEntryScreen({ db, uid, month, summary, access, onBack }: Cos
                 onCommit: (amount: Won) => drafts.commit(costDraftKey.primary(key), savePrimaryCost(db, month.yearMonth, key, amount, uid)),
               };
               if (key === WATER_RATE_KEY) {
-                // 수도 단가 — [금액] 원 / [총 사용량] 리터. 금액은 세대로 나누지 않고 단가 계산에만 쓴다 (F-17)
+                // 수도량 — [금액] 원 / [총 사용량] 리터. 금액은 세대로 나누지 않고 단가 계산에만 쓴다 (F-17)
                 const rate = waterRate(month);
                 return (
                   <fieldset key={key} className="flex flex-col gap-1 md:col-span-2">

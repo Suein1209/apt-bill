@@ -7,7 +7,7 @@ import type { PrimaryFeeItem, PrimaryFeeKey, SecondaryCategory, Won } from '../t
 export const PRIMARY_FEE_ITEMS = [
   { key: 'labor', label: '인건비' },
   { key: 'commonElectricity', label: '공동 전기요금' },
-  { key: 'commonWater', label: '수도 단가' },
+  { key: 'commonWater', label: '수도량' },
   { key: 'maintenance', label: '유지비' },
 ] as const satisfies readonly PrimaryFeeItem[];
 
