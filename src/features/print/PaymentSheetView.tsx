@@ -43,7 +43,7 @@ function CellHeading({ unit }: { unit: Unit }) {
 }
 
 /** 합계에 넣는 세대 — 관리실(자동 납부)·공실 제외 */
-const counts = (bill: UnitBill | undefined): bill is UnitBill => bill !== undefined && bill.isTarget && !bill.autoPaid;
+const counts = (bill: UnitBill | undefined): bill is UnitBill => bill !== undefined && bill.isTarget && !bill.exempt;
 
 export function PaymentSheetView({ mode, yearMonth, units, bills, onClose }: PaymentSheetViewProps) {
   const sheet = useMemo(() => buildPaymentSheet(units), [units]);
@@ -64,7 +64,7 @@ export function PaymentSheetView({ mode, yearMonth, units, bills, onClose }: Pay
   const cellText = (cell: SheetCell): string => {
     const bill = billOf(cell);
     if (!bill) return '';
-    if (bill.autoPaid) return OFFICE_MARK;
+    if (bill.exempt) return OFFICE_MARK;
     if (!bill.isTarget && bill.paid === 0) return VACANT_MARK;
     if (mode === 'check') return bill.isConfirmed ? CHECK_MARK : '';
     return bill.paid > 0 ? formatNumber(bill.paid) : '';
@@ -74,7 +74,7 @@ export function PaymentSheetView({ mode, yearMonth, units, bills, onClose }: Pay
   const totalText = (cells: readonly SheetCell[]): string => {
     const list = cells.map(billOf);
     if (mode === 'amount') {
-      const paid = list.reduce((total, bill) => total + (bill && !bill.autoPaid ? bill.paid : 0), 0);
+      const paid = list.reduce((total, bill) => total + (bill && !bill.exempt ? bill.paid : 0), 0);
       return paid > 0 ? formatNumber(paid) : '';
     }
     const targets = list.filter(counts);

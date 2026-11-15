@@ -28,7 +28,7 @@ export interface FirstFloorUnitSpec {
 
 /**
  * 1층 부과 단위 21곳 (REQUIREMENTS 3.1.2, 사용자가 알려준 순서)
- * 오리집1(5동)·오리집2(6동)는 한 부과 단위 SORI (H-22)
+ * 오리집1(5동)·오리집2(6동)는 한 부과 단위 SORI — 2세대 몫을 한 번에 내고 납부 상태를 함께 쓴다 (H-22)
  */
 export const FIRST_FLOOR_UNITS: readonly FirstFloorUnitSpec[] = [
   { id: 'S102', kind: 'shop', dongs: [1], ho: '102', alias: null, shopName: null },

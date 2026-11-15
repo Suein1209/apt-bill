@@ -14,7 +14,7 @@ import { makeMonth, makePayment } from './fixtures.ts';
 import type { MonthDoc, UnitBill, YearMonth } from '../../types/bill.ts';
 
 const units = buildUnits();
-const ALL_TARGETS = 129; // 관리실 포함 (H-26)
+const ALL_TARGETS = 129; // 관리실 제외, 오리집 2세대 (H-22, H-26)
 
 function billOf(bills: readonly UnitBill[], unitId: string): UnitBill {
   const bill = bills.find((item) => item.unitId === unitId);
@@ -23,18 +23,18 @@ function billOf(bills: readonly UnitBill[], unitId: string): UnitBill {
 }
 
 describe('부과 대상 (H-9, H-10, C-7)', () => {
-  it('관리실을 포함한 129곳 (H-26)', () => {
+  it('관리실을 빼고 오리집을 2세대로 세어 129세대 (H-22, H-26)', () => {
     expect(countTargets(units, makeMonth('2026-11'))).toBe(ALL_TARGETS);
   });
 
-  it('공실 10곳이면 119곳', () => {
+  it('공실 10곳(오리집 포함)이면 118세대', () => {
     const vacantIds = ['R201', 'R202', 'R203', 'R205', 'R206', 'R207', 'R208', 'R209', 'S102', 'SORI'];
     const month = makeMonth('2026-11', { vacant: Object.fromEntries(vacantIds.map((id) => [id, true])) });
-    expect(countTargets(units, month)).toBe(119);
+    expect(countTargets(units, month)).toBe(118);
 
     const bills = computeBills(units, month, {}, {});
     expect(billOf(bills, 'R201')).toMatchObject({ isTarget: false, charged: 0 });
-    expect(billOf(bills, 'S112')).toMatchObject({ isTarget: true, autoPaid: true, unpaid: 0, isConfirmed: true });
+    expect(billOf(bills, 'S112')).toMatchObject({ isTarget: false, exempt: true, charged: 0, unpaid: 0 });
   });
 });
 
@@ -85,13 +85,11 @@ describe('균등 분배와 10원 올림 (C-3, C-5, C-9, C-11, C-13)', () => {
     });
   });
 
-  it('모두 공실이면 관리실 한 곳이 나누고, 나머지는 청구 0원 (H-26)', () => {
+  it('모두 공실이면 나누는 세대가 없고 모두 청구 0원 (H-26)', () => {
     const vacant = Object.fromEntries(units.map((unit) => [unit.id, true as const]));
     const month = makeMonth('2026-11', { vacant, primaryCosts: { labor: 10_000, commonElectricity: 0, commonWater: 0, maintenance: 0 } });
-    expect(summarizeMonth(units, month)).toMatchObject({ targetCount: 1, perUnitShare: 10_000 });
-    const bills = computeBills(units, month, {}, {});
-    expect(bills.filter((bill) => !bill.autoPaid).every((bill) => bill.charged === 0)).toBe(true);
-    expect(billOf(bills, 'S112')).toMatchObject({ charged: 10_000, paid: 10_000, unpaid: 0 });
+    expect(summarizeMonth(units, month)).toMatchObject({ targetCount: 0, perUnitShare: 0 });
+    expect(computeBills(units, month, {}, {}).every((bill) => bill.charged === 0)).toBe(true);
   });
 });
 
@@ -225,12 +223,12 @@ describe('동 전 세대 납부 완료 (G-16)', () => {
   });
 });
 
-describe('관리실 자동 납부 (H-26)', () => {
+describe('관리실 부과 제외 (H-26, 2026-11-15 수정)', () => {
   const month = makeMonth('2026-11', { primaryCosts: { labor: 129_000, commonElectricity: 0, commonWater: 0, maintenance: 0 } });
 
-  it('몫은 다른 세대와 같고, 낸 것·납부 확인된 것으로 본다', () => {
+  it('나누지도 내지도 않는다', () => {
     const office = billOf(computeBills(units, month, {}, {}), 'S112');
-    expect(office).toMatchObject({ isTarget: true, autoPaid: true, charged: 1_000, paid: 1_000, unpaid: 0, isConfirmed: true });
+    expect(office).toMatchObject({ isTarget: false, exempt: true, shares: 0, charged: 0, paid: 0, unpaid: 0 });
   });
 
   it('결산 미납·이월·직접 수정에서 빠지고, 동 버튼 세대 수에서도 빠진다', () => {
@@ -239,5 +237,27 @@ describe('관리실 자동 납부 (H-26)', () => {
     expect(billOf(bills, 'S112')).toMatchObject({ override: null, carryOver: 0, unpaid: 0 });
     expect(closingUnpaid(bills).S112).toBeUndefined();
     expect(dongStatus(units, bills, 6)).toMatchObject({ targetCount: 15 });
+  });
+});
+
+describe('오리집 2세대 몫 (H-22, 2026-11-15 수정)', () => {
+  const month = makeMonth('2026-11', { primaryCosts: { labor: 129_000, commonElectricity: 0, commonWater: 0, maintenance: 0 } });
+
+  it('세대당 1,000원이면 오리집은 2세대분 2,000원을 한 번에 낸다', () => {
+    const bills = computeBills(units, month, {}, {});
+    expect(billOf(bills, 'R201')).toMatchObject({ shares: 1, charged: 1_000 });
+    expect(billOf(bills, 'SORI')).toMatchObject({ shares: 2, primaryShare: 2_000, charged: 2_000 });
+  });
+
+  it('납부 문서가 하나라 5동·6동의 미납·납부 확인이 함께 바뀐다', () => {
+    const unpaid = computeBills(units, month, {}, {});
+    expect(dongStatus(units, unpaid, 5).unpaidCount).toBe(dongStatus(units, unpaid, 5).targetCount);
+
+    const confirmed = computeBills(units, month, { SORI: makePayment(2_000, true) }, {});
+    const before5 = dongStatus(units, unpaid, 5).unpaidCount;
+    const before6 = dongStatus(units, unpaid, 6).unpaidCount;
+    expect(dongStatus(units, confirmed, 5).unpaidCount).toBe(before5 - 1);
+    expect(dongStatus(units, confirmed, 6).unpaidCount).toBe(before6 - 1);
+    expect(billOf(confirmed, 'SORI')).toMatchObject({ paid: 2_000, unpaid: 0, isConfirmed: true });
   });
 });

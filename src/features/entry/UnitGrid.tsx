@@ -43,10 +43,10 @@ const COL_COUNT = 5;
 
 const HEADERS = ['세대', '공실', '수도 사용량(리터)', '수도 요금', '이번 달 관리비', '이월 미납', '청구액', '납부 상태', '납부일', '납부 확인'] as const;
 
-/** 납부 상태 버튼 색 — 미납은 연한 주황, 완납은 짙은 색 (G-20) */
+/** 납부 상태 버튼 색 — 미납은 연한 주황, 완납은 연두 (G-20) */
 const PAID_BUTTON_CLASS = {
   unpaid: 'border-orange-400 bg-orange-100 text-orange-900 hover:bg-orange-200',
-  paid: 'border-slate-900 bg-slate-800 text-white hover:bg-slate-700',
+  paid: 'border-lime-600 bg-lime-300 text-lime-950 hover:bg-lime-400',
 } as const;
 
 /** 입력할 수 있는 칸 — 이번 달 관리비·납부일은 보기 전용 (G-17, G-19), 납부는 버튼 (G-20) */
@@ -211,8 +211,8 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
               {units.map((unit, row) => {
                 const bill = billById.get(unit.id);
                 if (!bill) return null;
-                // 관리실은 자동 납부 — 이름만 보이고 입력·납부 상태·납부 확인 칸은 없다 (H-26)
-                if (bill.autoPaid) {
+                // 관리실은 관리비를 나누지도 내지도 않는다 — 이름만 보이고 입력·납부 칸은 없다 (H-26)
+                if (bill.exempt) {
                   return (
                     <tr key={unit.id} className="border-b border-slate-200 bg-slate-100 text-slate-600">
                       <th scope="row" className="whitespace-nowrap px-2 py-2 text-left font-bold">
@@ -243,6 +243,8 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
                   <tr key={unit.id} className={`border-b border-slate-200 ${bill.isTarget ? '' : 'bg-slate-100 text-slate-600'}`}>
                     <th scope="row" className="whitespace-nowrap px-2 py-2 text-left font-bold">
                       {unitLabel(unit)}
+                      {/* 오리집은 5·6동 두 세대 몫 — 어느 동에서 바꿔도 두 동에 함께 반영된다 (H-22) */}
+                      {bill.shares > 1 && <span className="block text-base font-semibold text-blue-800">{bill.shares}세대분 합계</span>}
                     </th>
                     <td className="px-2 text-center">
                       <input

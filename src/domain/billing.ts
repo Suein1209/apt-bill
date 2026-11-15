@@ -32,21 +32,27 @@ export interface MonthRecord {
 /* 부과 대상 · 합계                                                      */
 /* ------------------------------------------------------------------ */
 
-/** 고지·납부 없이 자동 납부로 보는 곳 — 관리실 (H-26) */
-export function isAutoPaid(unit: Unit): boolean {
+/** 관리비를 나누지도 내지도 않는 곳 — 관리실 (H-26, 2026-11-15 수정) */
+export function isExempt(unit: Unit): boolean {
   return unit.kind === 'office';
 }
 
 /**
- * 부과 대상(나누는 세대) — 공실이 아닌 곳 (H-10, C-7).
- * 관리실도 한 세대로 나눈다 (H-9 수정, H-26). 관리실은 공실이 될 수 없다.
+ * 한 부과 단위가 몇 세대 몫을 내는지 (H-22, 2026-11-15 수정).
+ * 여러 동에 걸친 곳은 동마다 1세대 — 오리집(5·6동)은 2세대 몫을 한 번에 낸다. 관리실은 0.
  */
-export function isBillingTarget(unit: Unit, month: MonthDoc): boolean {
-  return isAutoPaid(unit) || month.vacant[unit.id] !== true;
+export function shareCount(unit: Unit): number {
+  return isExempt(unit) ? 0 : unit.dongs.length;
 }
 
+/** 부과 대상(나누는 세대) — 관리실이 아니고 공실이 아닌 곳 (H-10, C-7, H-26) */
+export function isBillingTarget(unit: Unit, month: MonthDoc): boolean {
+  return !isExempt(unit) && month.vacant[unit.id] !== true;
+}
+
+/** 나누는 세대 수 — 오리집은 2세대로 센다 */
 export function countTargets(units: readonly Unit[], month: MonthDoc): number {
-  return units.filter((unit) => isBillingTarget(unit, month)).length;
+  return sum(units.filter((unit) => isBillingTarget(unit, month)).map(shareCount));
 }
 
 export function sumPrimary(month: MonthDoc): Won {
@@ -82,12 +88,12 @@ function waterAmount(unit: Unit, month: MonthDoc): Won {
 /**
  * 그 달 모든 부과 단위의 청구액을 계산한다.
  *
- * 부과 대상 u:
+ * 부과 대상 u (몫 w = shareCount, 오리집 2·나머지 1):
  *   직접 수정 있음  charged = ceil10(override + carry)                              (C-14, C-15)
- *   없음            charged = ceil10((P + S)/N + water + carry)
- *                          = ceil((P + S + N·(water + carry)) / (10·N)) × 10       (C-5, C-11)
+ *   없음            charged = ceil10((P + S)·w/N + water + carry)
+ *                          = ceil((w·(P + S) + N·(water + carry)) / (10·N)) × 10   (C-5, C-11)
  * 부과 대상 아님(공실): 이번 달 관리비 없이 이월 미납만 청구                     (Design §12 Q4)
- * 관리실(자동 납부): 몫은 계산하되 낸 것·납부 확인된 것으로 본다. 이월·직접 수정 없음   (H-26)
+ * 관리실: 나누지도 내지도 않는다. 청구·이월·직접 수정 없음                         (H-26)
  * 표시용 분배액은 원 미만 버림 (C-13)
  */
 export function computeBills(
@@ -102,11 +108,12 @@ export function computeBills(
   const sharedTotal = primaryTotal + secondaryTotal;
 
   return units.map((unit) => {
-    const autoPaid = isAutoPaid(unit);
-    const carryOver = autoPaid ? 0 : (carryOvers[unit.id] ?? 0);
+    const exempt = isExempt(unit);
+    const shares = shareCount(unit);
+    const carryOver = exempt ? 0 : (carryOvers[unit.id] ?? 0);
     const payment = payments[unit.id];
     const isTarget = isBillingTarget(unit, month) && targetCount > 0;
-    const override = isTarget && !autoPaid ? (month.overrides[unit.id] ?? null) : null;
+    const override = isTarget && !exempt ? (month.overrides[unit.id] ?? null) : null;
     const water = isTarget ? waterAmount(unit, month) : 0;
 
     let charged: Won;
@@ -115,23 +122,24 @@ export function computeBills(
     } else if (override !== null) {
       charged = ceilWon(override + carryOver);
     } else {
-      charged = ceilToUnit(sharedTotal + targetCount * (water + carryOver), targetCount);
+      charged = ceilToUnit(shares * sharedTotal + targetCount * (water + carryOver), targetCount);
     }
 
-    const paid = autoPaid ? charged : (payment?.paidAmount ?? 0);
+    const paid = exempt ? 0 : (payment?.paidAmount ?? 0);
     return {
       unitId: unit.id,
       isTarget,
-      autoPaid,
-      primaryShare: isTarget ? floorDiv(primaryTotal, targetCount) : 0,
-      secondaryShare: isTarget ? floorDiv(secondaryTotal, targetCount) : 0,
+      exempt,
+      shares,
+      primaryShare: isTarget ? floorDiv(primaryTotal * shares, targetCount) : 0,
+      secondaryShare: isTarget ? floorDiv(secondaryTotal * shares, targetCount) : 0,
       water,
       override,
       carryOver,
       charged,
       paid,
       unpaid: charged - paid,
-      isConfirmed: autoPaid || (payment?.confirmed ?? false),
+      isConfirmed: payment?.confirmed ?? false,
     };
   });
 }
@@ -195,13 +203,14 @@ export function isDongFullyPaid(status: DongStatus): boolean {
 
 /**
  * 동별 미납 세대 수 — 이번 달, 부과 대상만, 관리자 "납부 완료"가 아니면 미납
- * (G-4, G-6, G-7, G-10, G-11). 자동 납부(관리실)는 세지 않는다 (H-26)
+ * (G-4, G-6, G-7, G-10, G-11). 관리실은 부과 대상이 아니라 세지 않는다 (H-26).
+ * 오리집은 5동·6동에 1세대씩 센다 — 납부 문서가 하나라 두 동의 상태가 함께 바뀐다
  */
 export function dongStatus(units: readonly Unit[], bills: readonly UnitBill[], dong: number): DongStatus {
   const billById = new Map(bills.map((bill) => [bill.unitId, bill]));
   const targets = unitsInDong(units, dong)
     .map((unit) => billById.get(unit.id))
-    .filter((bill): bill is UnitBill => bill !== undefined && bill.isTarget && !bill.autoPaid);
+    .filter((bill): bill is UnitBill => bill !== undefined && bill.isTarget);
   return {
     dong,
     targetCount: targets.length,

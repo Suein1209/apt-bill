@@ -38,7 +38,7 @@ export type YearMonth = `${number}-${Month}`;
  * 부과 단위 ID
  * - 주거: 'R' + 호수            예) R201, R820   (호수는 건물 전체에서 유일, H-18)
  * - 상가: 'S' + 호수[_순번]     예) S102, S101_1 (H-15)
- * - 오리집: 'SORI'              (H-22, 두 공간 = 부과 단위 1개)
+ * - 오리집: 'SORI'              (H-22, 5·6동 두 공간 = 부과 단위 1개, 2세대 몫)
  * - 관리사무소: 'S112'          (H-20)
  */
 export type UnitId = string;
@@ -175,10 +175,12 @@ export interface PaymentDoc {
 
 export interface UnitBill {
   unitId: UnitId;
-  /** 나누는 세대에 드는지 — 공실이면 false (H-10). 관리실은 true (H-9, 2026-11-14 수정) */
+  /** 나누는 세대에 드는지 — 공실·관리실이면 false (H-10, H-26) */
   isTarget: boolean;
-  /** 관리실처럼 고지·납부 없이 자동 납부로 보는 곳 (H-26) — 청구액만큼 낸 것으로, 납부 확인된 것으로 친다 */
-  autoPaid: boolean;
+  /** 관리실처럼 나누지도 내지도 않는 곳 (H-26, 2026-11-15 수정) — 입력·출력에서 이름만 보인다 */
+  exempt: boolean;
+  /** 몇 세대 몫인지 — 오리집 2, 관리실 0, 나머지 1 (H-22) */
+  shares: number;
   /** 1차 분배액, 표시용 원 미만 버림 (C-13) */
   primaryShare: Won;
   /** 2차 분배액, 표시용 원 미만 버림 (C-13) */
