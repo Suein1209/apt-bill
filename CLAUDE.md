@@ -18,6 +18,7 @@
      - 파일 API 확인: `trail skeleton <파일>`
      - 변경 영향 범위: `trail callers <심볼> --depth 2`
    - trail 결과로 부족할 때만 해당 `file:line` 범위를 직접 읽는다.
+   - 앱 동작을 바꾸면 같은 작업 안에서 `docs/TEST-SCENARIOS.md`도 고친다: "변경 이력"에 한 줄 추가(커밋 전이면 "(미커밋)", 커밋 후 해시로 바꿈), 확인 방법을 "시나리오"에 추가·수정한다.
    - trail 설치·초기화 (trail-code v0.29.0 기준):
      - 설치: `npm install -g trail-code --ignore-scripts`. `EACCES`가 나면 sudo를 쓰지 말고 `npm config set prefix ~/.npm-global` 후 다시 설치하고, `~/.zshrc`·`~/.bash_profile`에 `export PATH="$HOME/.npm-global/bin:$PATH"`를 추가한다.
      - 저장소 지도 생성: `trail build` (지도는 git에 포함되지 않는 `graft/` 폴더에 저장됨). `trail init`은 AGENTS.md 작성·MCP 등록까지 하므로 쓰지 않는다. `--no-agents` 옵션은 이 버전에 없다.
