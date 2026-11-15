@@ -67,8 +67,8 @@ function NoticeSelect({ payers, selected, onChange, onPreview, onClose }: Notice
   };
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <header className="flex flex-wrap items-center gap-4 border-b-2 border-slate-300 bg-white px-6 py-4">
+    <div className="min-h-screen bg-page">
+      <header className="flex flex-wrap items-center gap-4 app-bar px-6 py-4">
         <BigButton variant="secondary" icon={<ArrowLeft className="h-6 w-6" aria-hidden="true" />} onClick={onClose}>
           홈으로
         </BigButton>
@@ -94,19 +94,19 @@ function NoticeSelect({ payers, selected, onChange, onPreview, onClose }: Notice
                 type="button"
                 aria-pressed={active}
                 onClick={() => setDong(item)}
-                className={`flex flex-col items-center rounded-xl border-4 px-2 py-3 focus:outline-none focus:ring-4 focus:ring-blue-400 ${
-                  active ? 'border-blue-800 bg-blue-800 text-white' : 'border-slate-700 bg-white hover:bg-slate-100'
+                className={`flex flex-col items-center rounded-[14px] border-2 px-2 py-3 shadow-card focus:outline-none focus:ring-4 focus:ring-blue-400 ${
+                  active ? 'border-brand bg-brand text-white' : 'border-line bg-white hover:border-slate-400'
                 }`}
               >
                 <span className="text-2xl font-extrabold">{item}동</span>
-                <span className={`text-base ${count > 0 ? 'font-bold' : 'opacity-70'}`}>{count > 0 ? `✓ ${count}세대` : '선택 없음'}</span>
+                <span className={`text-base ${count > 0 ? 'font-bold' : active ? 'text-blue-100' : 'text-slate-600'}`}>{count > 0 ? `✓ ${count}세대` : '선택 없음'}</span>
               </button>
             );
           })}
         </div>
 
         {dong !== null && (
-          <section aria-labelledby="notice-dong-title" className="space-y-4 rounded-2xl border-2 border-slate-300 bg-white p-5">
+          <section aria-labelledby="notice-dong-title" className="space-y-4 card p-5">
             <div className="flex flex-wrap items-center gap-4">
               <h2 id="notice-dong-title" className="text-2xl font-bold">
                 {dong}동 세대
@@ -133,8 +133,8 @@ function NoticeSelect({ payers, selected, onChange, onPreview, onClose }: Notice
                     type="button"
                     aria-pressed={on}
                     onClick={() => toggle([unit.id], !on)}
-                    className={`flex min-h-16 items-center justify-center gap-1 rounded-xl border-2 px-2 py-3 text-xl font-bold focus:outline-none focus:ring-4 focus:ring-blue-400 ${
-                      on ? 'border-blue-800 bg-blue-100 text-blue-950' : 'border-slate-400 bg-white text-slate-800 hover:bg-slate-50'
+                    className={`flex min-h-16 items-center justify-center gap-1 rounded-[14px] border-2 px-2 py-3 text-xl font-bold focus:outline-none focus:ring-4 focus:ring-blue-400 ${
+                      on ? 'border-brand bg-brand-soft text-brand' : 'border-slate-300 bg-white text-slate-800 hover:border-slate-400'
                     }`}
                   >
                     {on && <Check className="h-6 w-6 shrink-0" aria-hidden="true" />}
@@ -182,7 +182,7 @@ function NoticePreview({ month, units, billById, targetCount, onBack }: NoticePr
 
   return (
     <div className="min-h-screen bg-slate-300 print:bg-white">
-      <header className="no-print flex flex-wrap items-center gap-4 border-b-2 border-slate-400 bg-white px-6 py-4">
+      <header className="no-print flex flex-wrap items-center gap-4 app-bar px-6 py-4">
         <BigButton variant="secondary" icon={<ArrowLeft className="h-6 w-6" aria-hidden="true" />} onClick={onBack}>
           세대 다시 고르기
         </BigButton>

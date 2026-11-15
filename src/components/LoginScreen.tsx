@@ -34,11 +34,11 @@ export function LoginScreen({ auth }: LoginScreenProps) {
       <form
         onSubmit={handleSubmit}
         noValidate
-        className="w-full max-w-md rounded-2xl border-2 border-slate-300 bg-white p-8 shadow-lg"
+        className="w-full max-w-md card p-8"
       >
         <div className="mb-8 flex flex-col items-center gap-3">
-          <Building2 className="h-14 w-14 text-blue-800" aria-hidden="true" />
-          <h1 className="text-3xl font-bold">{APP_TITLE}</h1>
+          <Building2 className="h-14 w-14 text-brand" aria-hidden="true" />
+          <h1 className="text-3xl font-extrabold">{APP_TITLE}</h1>
         </div>
 
         <label htmlFor="email" className="mb-2 block text-xl font-semibold">
@@ -52,7 +52,7 @@ export function LoginScreen({ auth }: LoginScreenProps) {
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="mb-6 w-full rounded-lg border-2 border-slate-500 px-4 py-3 text-xl focus:border-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-200"
+          className="mb-6 w-full rounded-xl border-2 border-slate-400 px-4 py-3 text-xl focus:border-brand focus:outline-none focus:ring-4 focus:ring-blue-200"
         />
 
         <label htmlFor="password" className="mb-2 block text-xl font-semibold">
@@ -66,7 +66,7 @@ export function LoginScreen({ auth }: LoginScreenProps) {
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-lg border-2 border-slate-500 py-3 pl-4 pr-16 text-xl focus:border-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-200"
+            className="w-full rounded-xl border-2 border-slate-400 py-3 pl-4 pr-16 text-xl focus:border-brand focus:outline-none focus:ring-4 focus:ring-blue-200"
           />
           <button
             type="button"
@@ -81,7 +81,7 @@ export function LoginScreen({ auth }: LoginScreenProps) {
         {errorMessage && (
           <p
             role="alert"
-            className="mb-6 rounded-lg border-2 border-red-700 bg-red-50 px-4 py-3 text-lg font-semibold text-red-800"
+            className="mb-6 rounded-xl border-2 border-red-700 bg-red-50 px-4 py-3 text-lg font-semibold text-red-800"
           >
             {errorMessage}
           </p>
@@ -90,7 +90,7 @@ export function LoginScreen({ auth }: LoginScreenProps) {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="flex w-full items-center justify-center gap-3 rounded-lg bg-blue-800 px-4 py-4 text-2xl font-bold text-white hover:bg-blue-900 focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:cursor-wait disabled:bg-slate-500"
+          className="flex w-full items-center justify-center gap-3 rounded-[14px] bg-brand px-4 py-4 text-2xl font-bold text-white hover:bg-brand-strong focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:cursor-wait disabled:bg-slate-500"
         >
           <LogIn className="h-7 w-7" aria-hidden="true" />
           {isSubmitting ? '로그인 중…' : '로그인'}

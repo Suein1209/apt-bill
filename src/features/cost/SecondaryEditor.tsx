@@ -65,7 +65,7 @@ export function SecondaryEditor({ db, uid, yearMonth, categories, canEdit, draft
   return (
     <div className="space-y-6">
       {categories.map((category) => (
-        <section key={category.id} className="rounded-xl border-2 border-slate-300 bg-white p-4">
+        <section key={category.id} className="rounded-[14px] border border-line bg-slate-50 p-4">
           <div className="mb-3 flex items-center gap-3">
             <div className="flex-1">
               <TextInput
@@ -80,7 +80,7 @@ export function SecondaryEditor({ db, uid, yearMonth, categories, canEdit, draft
             </div>
             <span className="text-xl font-bold tabular-nums">{formatWon(sum(category.items.map((item) => item.amount)))}</span>
             {canEdit && (
-              <button type="button" aria-label={`${category.name} 카테고리 삭제`} onClick={() => setPending({ kind: 'category', categoryId: category.id, name: category.name })} className="rounded-lg border-2 border-red-700 p-2 text-red-700 hover:bg-red-50 focus:outline-none focus:ring-4 focus:ring-red-200">
+              <button type="button" aria-label={`${category.name} 카테고리 삭제`} onClick={() => setPending({ kind: 'category', categoryId: category.id, name: category.name })} className="rounded-xl border-2 border-red-700 bg-white p-2.5 text-red-700 hover:bg-red-50 focus:outline-none focus:ring-4 focus:ring-red-200">
                 <Trash2 className="h-6 w-6" aria-hidden="true" />
               </button>
             )}
@@ -117,7 +117,7 @@ export function SecondaryEditor({ db, uid, yearMonth, categories, canEdit, draft
                   }
                 />
                 {canEdit ? (
-                  <button type="button" aria-label={`${item.name} 항목 삭제`} onClick={() => setPending({ kind: 'item', categoryId: category.id, itemId: item.id, name: item.name })} className="mb-1 rounded-lg border-2 border-red-700 p-2 text-red-700 hover:bg-red-50 focus:outline-none focus:ring-4 focus:ring-red-200">
+                  <button type="button" aria-label={`${item.name} 항목 삭제`} onClick={() => setPending({ kind: 'item', categoryId: category.id, itemId: item.id, name: item.name })} className="mb-1 rounded-xl border-2 border-red-700 bg-white p-2.5 text-red-700 hover:bg-red-50 focus:outline-none focus:ring-4 focus:ring-red-200">
                     <Trash2 className="h-6 w-6" aria-hidden="true" />
                   </button>
                 ) : (

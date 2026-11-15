@@ -24,7 +24,7 @@ export function LogoutButton({ auth }: LogoutButtonProps) {
       <button
         type="button"
         onClick={handleLogout}
-        className="flex items-center gap-2 rounded-lg border-2 border-slate-700 px-4 py-2 text-lg font-semibold hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-blue-300"
+        className="flex min-h-12 items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-lg font-semibold hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-blue-300"
       >
         <LogOut className="h-6 w-6" aria-hidden="true" />
         로그아웃

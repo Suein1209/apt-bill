@@ -86,7 +86,7 @@ export function MonthHome({ auth, db, uid, profile, units, months, monthList, cu
   }
 
   return (
-    <div className="min-h-screen bg-slate-100">
+    <div className="min-h-screen bg-page">
       <MonthHeader
         auth={auth}
         profile={profile}
@@ -102,25 +102,25 @@ export function MonthHome({ auth, db, uid, profile, units, months, monthList, cu
           </p>
         )}
 
-        <section className="flex flex-wrap items-center gap-6 rounded-2xl border-2 border-slate-300 bg-white p-5">
+        {/* 이번 달 비용 요약 — 큰 숫자 세 개 + 비용 입력 버튼 (시안 A) */}
+        <section aria-label="이번 달 비용" className="card flex flex-wrap items-center gap-5 p-6">
+          <SummaryStat label="공용 비용" value={formatWon(summary.primaryTotal)} />
+          <SummaryStat label="유지비 지출" value={formatWon(summary.secondaryTotal)} divided />
+          <SummaryStat label="세대당 금액" value={formatWon(summary.perUnitShare)} divided accent />
           <BigButton icon={<Calculator className="h-7 w-7" aria-hidden="true" />} onClick={() => setView({ kind: 'cost' })}>
             {access.canEdit ? '이번 달 비용 입력' : '비용 보기'}
           </BigButton>
-          <span className="text-xl">
-            공용 비용 <strong className="tabular-nums">{formatWon(summary.primaryTotal)}</strong>
-          </span>
-          <span className="text-xl">
-            유지비 지출 <strong className="tabular-nums">{formatWon(summary.secondaryTotal)}</strong>
-          </span>
-          <span className="text-xl">
-            세대당 <strong className="tabular-nums">{formatWon(summary.perUnitShare)}</strong>
-          </span>
         </section>
 
-        <DongButtonGrid units={units} bills={bills} onSelectDong={(dong) => setView({ kind: 'dong', dong })} />
+        <section aria-labelledby="dong-title" className="space-y-3">
+          <h2 id="dong-title" className="text-2xl font-bold">
+            동별 입력
+          </h2>
+          <DongButtonGrid units={units} bills={bills} onSelectDong={(dong) => setView({ kind: 'dong', dong })} />
+        </section>
 
         {/* 맨 아래 — 새 달 시작·결산(관리자), 출력(모두) */}
-        <section className="flex flex-wrap gap-4 border-t-2 border-slate-300 pt-6">
+        <section className="flex flex-wrap gap-4 pt-2">
           {isAdmin && target === latest && (
             <BigButton variant="secondary" icon={<CalendarPlus className="h-6 w-6" aria-hidden="true" />} onClick={() => setStartingMonth(true)}>
               새 달 시작
@@ -157,6 +157,25 @@ export function MonthHome({ auth, db, uid, profile, units, months, monthList, cu
           onCancel={() => setStartingMonth(false)}
         />
       )}
+    </div>
+  );
+}
+
+interface SummaryStatProps {
+  label: string;
+  value: string;
+  /** 왼쪽에 옅은 구분선 */
+  divided?: boolean;
+  /** 강조 색(세대당 금액) */
+  accent?: boolean;
+}
+
+/** 홈 비용 요약의 숫자 하나 */
+function SummaryStat({ label, value, divided = false, accent = false }: SummaryStatProps) {
+  return (
+    <div className={`flex min-w-48 flex-1 flex-col gap-1 px-2 ${divided ? 'sm:border-l sm:border-line sm:pl-5' : ''}`}>
+      <span className="text-lg text-slate-600">{label}</span>
+      <strong className={`text-3xl font-extrabold tabular-nums ${accent ? 'text-brand' : ''}`}>{value}</strong>
     </div>
   );
 }

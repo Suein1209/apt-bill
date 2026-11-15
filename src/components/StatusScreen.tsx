@@ -11,7 +11,7 @@ export function StatusScreen({ title, children, tone = 'info' }: StatusScreenPro
   const titleColor = tone === 'error' ? 'text-red-800' : 'text-black';
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10">
-      <div className="w-full max-w-xl rounded-2xl border-2 border-slate-300 bg-white p-8 shadow-lg">
+      <div className="w-full max-w-xl card p-8">
         <h1 className={`mb-4 text-2xl font-bold ${titleColor}`}>{title}</h1>
         {children && <div className="space-y-3 text-lg">{children}</div>}
       </div>

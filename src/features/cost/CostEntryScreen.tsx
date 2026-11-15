@@ -93,8 +93,8 @@ export function CostEntryScreen({ db, uid, month, summary, access, onBack }: Cos
   };
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <header className="flex items-center gap-4 border-b-2 border-slate-300 bg-white px-6 py-4">
+    <div className="min-h-screen bg-page">
+      <header className="flex items-center gap-4 app-bar px-6 py-4">
         <BigButton variant="secondary" icon={<ArrowLeft className="h-6 w-6" aria-hidden="true" />} onClick={onBack}>
           홈으로
         </BigButton>
@@ -103,13 +103,13 @@ export function CostEntryScreen({ db, uid, month, summary, access, onBack }: Cos
 
       <main className="mx-auto max-w-5xl space-y-8 px-6 py-6">
         {access.reason && (
-          <p role="status" className="rounded-lg border-2 border-amber-700 bg-amber-50 px-4 py-3 text-lg font-semibold text-amber-900">
+          <p role="status" className="rounded-xl border-2 border-amber-700 bg-amber-50 px-4 py-3 text-lg font-semibold text-amber-900">
             {access.reason}
           </p>
         )}
 
         {showRestore && (
-          <div role="alert" className="flex flex-wrap items-center gap-4 rounded-lg border-2 border-amber-600 bg-amber-50 px-4 py-3 text-lg">
+          <div role="alert" className="flex flex-wrap items-center gap-4 rounded-xl border-2 border-amber-600 bg-amber-50 px-4 py-3 text-lg">
             <span className="font-semibold">저장하지 못한 입력 {drafts.pending.length}개가 남아 있습니다.</span>
             <BigButton onClick={() => void restoreDraft()} disabled={!access.canEdit}>
               다시 저장
@@ -120,17 +120,18 @@ export function CostEntryScreen({ db, uid, month, summary, access, onBack }: Cos
           </div>
         )}
 
-        <section aria-labelledby="totals" className="grid grid-cols-2 gap-4 rounded-2xl border-2 border-blue-800 bg-blue-50 p-6 text-xl md:grid-cols-4">
+        {/* 합계 칸 4개 — 세대당 금액만 남색으로 강조 (시안 A) */}
+        <section aria-labelledby="totals" className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <h2 id="totals" className="sr-only">
             합계
           </h2>
           <Stat label="공용 비용 합계" value={formatWon(summary.primaryTotal)} />
           <Stat label="유지비 지출 합계 (나누지 않음)" value={formatWon(summary.secondaryTotal)} />
           <Stat label="나누는 세대 (오리집 2세대, 관리실 제외)" value={`${summary.targetCount}세대`} />
-          <Stat label="세대당 금액 (인건비·전기·유지비 ÷ 세대)" value={formatWon(summary.perUnitShare)} />
+          <Stat label="세대당 금액 (인건비·전기·유지비 ÷ 세대)" value={formatWon(summary.perUnitShare)} accent />
         </section>
 
-        <section aria-labelledby="primary" className="rounded-2xl border-2 border-slate-300 bg-white p-6">
+        <section aria-labelledby="primary" className="card p-6">
           <SectionTitle id="primary" title="공용 비용" total={summary.primaryTotal} />
           <div className="grid gap-5 md:grid-cols-2">
             {PRIMARY_FEE_ITEMS.map(({ key, label }) => {
@@ -197,7 +198,7 @@ export function CostEntryScreen({ db, uid, month, summary, access, onBack }: Cos
           </div>
         </section>
 
-        <section aria-labelledby="secondary">
+        <section aria-labelledby="secondary" className="card p-6">
           <SectionTitle id="secondary" title="유지비 지출 내역" total={summary.secondaryTotal} note="세대당 금액 계산에는 넣지 않습니다." />
           <SecondaryEditor db={db} uid={uid} yearMonth={month.yearMonth} categories={month.secondaryCategories} canEdit={access.canEdit} drafts={drafts} />
         </section>
@@ -221,11 +222,11 @@ function SectionTitle({ id, title, total, note }: { id: string; title: string; t
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
   return (
-    <div className="flex flex-col">
-      <span className="text-lg text-slate-700">{label}</span>
-      <span className="text-2xl font-bold tabular-nums">{value}</span>
+    <div className={`flex flex-col gap-1 rounded-[18px] p-5 ${accent ? 'bg-brand text-white shadow-card' : 'card'}`}>
+      <span className={`text-lg ${accent ? 'text-blue-100' : 'text-slate-600'}`}>{label}</span>
+      <span className="text-3xl font-extrabold tabular-nums">{value}</span>
     </div>
   );
 }

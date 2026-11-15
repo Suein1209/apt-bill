@@ -37,7 +37,7 @@ export function PrintMenuDialog({ onSelect, onCancel }: PrintMenuDialogProps) {
 
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="print-menu-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-xl rounded-2xl border-2 border-slate-400 bg-white p-8 shadow-xl">
+      <div className="w-full max-w-xl card p-8 shadow-xl">
         <h2 id="print-menu-title" className="mb-6 text-2xl font-bold">
           무엇을 출력할까요?
         </h2>
@@ -50,9 +50,9 @@ export function PrintMenuDialog({ onSelect, onCancel }: PrintMenuDialogProps) {
                 type="button"
                 autoFocus={choice === CHOICES[0]}
                 onClick={() => onSelect(choice)}
-                className="flex w-full items-center gap-4 rounded-xl border-4 border-slate-700 bg-white p-5 text-left hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-blue-400"
+                className="flex w-full items-center gap-4 rounded-[18px] border-2 border-slate-300 bg-white p-5 text-left hover:border-brand hover:bg-blue-50 focus:border-brand focus:outline-none focus:ring-4 focus:ring-blue-300"
               >
-                <Icon className="h-10 w-10 shrink-0" aria-hidden="true" />
+                <Icon className="h-10 w-10 shrink-0 text-brand" aria-hidden="true" />
                 <span>
                   <span className="block text-2xl font-extrabold">{TITLES[choice]}</span>
                   <span className="block text-lg text-slate-700">{DESCRIPTIONS[choice]}</span>

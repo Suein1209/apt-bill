@@ -97,7 +97,7 @@ function FirstMonthSetup({ auth, db, uid, onDone }: { auth: Auth; db: Firestore;
         aria-label="첫 달"
         value={value}
         onChange={(event) => setValue(event.target.value)}
-        className="w-full rounded-lg border-2 border-slate-500 px-3 py-2 text-xl focus:outline-none focus:ring-4 focus:ring-blue-200"
+        className="w-full rounded-xl border-2 border-slate-400 px-3 py-2.5 text-xl focus:outline-none focus:ring-4 focus:ring-blue-200"
       />
       <div className="flex justify-between">
         <LogoutButton auth={auth} />

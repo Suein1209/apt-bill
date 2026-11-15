@@ -86,7 +86,7 @@ export function PaymentSheetView({ mode, yearMonth, units, bills, onClose }: Pay
 
   return (
     <div className="min-h-screen bg-slate-300 print:bg-white">
-      <header className="no-print flex flex-wrap items-center gap-4 border-b-2 border-slate-400 bg-white px-6 py-4">
+      <header className="no-print flex flex-wrap items-center gap-4 app-bar px-6 py-4">
         <BigButton variant="secondary" icon={<ArrowLeft className="h-6 w-6" aria-hidden="true" />} onClick={onClose}>
           홈으로
         </BigButton>

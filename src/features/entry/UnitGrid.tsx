@@ -149,25 +149,25 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
   const saveStatus = saving > 0 ? '저장 중…' : lastError ? lastError : '저장됨';
 
   return (
-    <div className="min-h-screen bg-slate-100">
-      <header className="flex flex-wrap items-center gap-4 border-b-2 border-slate-300 bg-white px-6 py-4">
+    <div className="min-h-screen bg-page">
+      <header className="flex flex-wrap items-center gap-4 app-bar px-6 py-4">
         <BigButton variant="secondary" icon={<ArrowLeft className="h-6 w-6" aria-hidden="true" />} onClick={onBack}>
           홈으로
         </BigButton>
         <h1 className="text-3xl font-bold">
           {formatYearMonth(ym)} · {dong}동
         </h1>
-        <span role="status" className={`ml-auto rounded-lg px-3 py-1 text-lg font-bold ${lastError ? 'bg-red-100 text-red-800' : saving ? 'bg-amber-100 text-amber-900' : 'bg-green-100 text-green-900'}`}>
+        <span role="status" className={`ml-auto rounded-full px-4 py-1 text-lg font-bold ${lastError ? 'bg-red-100 text-red-800' : saving ? 'bg-amber-100 text-amber-900' : 'bg-green-100 text-green-900'}`}>
           {saveStatus}
         </span>
       </header>
 
       <main className="space-y-4 px-6 py-6">
         {access.reason && (
-          <p className="rounded-lg border-2 border-amber-700 bg-amber-50 px-4 py-3 text-lg font-semibold text-amber-900">{access.reason}</p>
+          <p className="rounded-xl border-2 border-amber-700 bg-amber-50 px-4 py-3 text-lg font-semibold text-amber-900">{access.reason}</p>
         )}
         {showRestore && (
-          <div role="alert" className="flex flex-wrap items-center gap-4 rounded-lg border-2 border-amber-600 bg-amber-50 px-4 py-3 text-lg">
+          <div role="alert" className="flex flex-wrap items-center gap-4 rounded-xl border-2 border-amber-600 bg-amber-50 px-4 py-3 text-lg">
             <span className="font-semibold">저장하지 못한 입력 {drafts.pending.length}개가 남아 있습니다.</span>
             <BigButton onClick={() => void restoreDraft()} disabled={!access.canEdit}>
               다시 저장
@@ -177,14 +177,14 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
             </BigButton>
           </div>
         )}
-        <p className="text-lg text-slate-700">↑↓ 위아래 · ←→ 옆 칸 · Enter 아래 칸 · 스페이스 체크</p>
+        <p className="text-lg text-slate-600">↑↓ 위아래 · ←→ 옆 칸 · Enter 아래 칸 · 스페이스 체크</p>
 
-        <div className="overflow-x-auto rounded-xl border-2 border-slate-300 bg-white">
+        <div className="overflow-x-auto card">
           <table className="w-full min-w-[1100px] border-collapse text-lg">
-            <thead className="sticky top-0 bg-slate-200 text-left">
+            <thead className="sticky top-0 bg-slate-100 text-left">
               <tr>
                 {HEADERS.map((title, index) => (
-                  <th key={index} scope="col" className="whitespace-nowrap border-b-2 border-slate-400 px-2 py-2 font-bold">
+                  <th key={index} scope="col" className="whitespace-nowrap border-b-2 border-line px-3 py-3 font-bold">
                     {title}
                   </th>
                 ))}
@@ -197,8 +197,8 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
                 // 관리실은 관리비를 나누지도 내지도 않는다 — 이름만 보이고 입력·납부 칸은 없다 (H-26)
                 if (bill.exempt) {
                   return (
-                    <tr key={unit.id} className="border-b border-slate-200 bg-slate-100 text-slate-600">
-                      <th scope="row" className="whitespace-nowrap px-2 py-2 text-left font-bold">
+                    <tr key={unit.id} className="border-b border-line bg-slate-50 text-slate-600">
+                      <th scope="row" className="whitespace-nowrap px-3 py-3 text-left font-bold">
                         {unitLabel(unit)}
                       </th>
                       <td colSpan={HEADERS.length - 1} />
@@ -223,11 +223,15 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
                 const commitHandler = (field: DraftField) => (text: string) => commitCell(unit.id, field, text);
 
                 return (
-                  <tr key={unit.id} className={`border-b border-slate-200 ${bill.isTarget ? '' : 'bg-slate-100 text-slate-600'}`}>
-                    <th scope="row" className="whitespace-nowrap px-2 py-2 text-left font-bold">
+                  // 입력 중인 줄은 옅은 파랑 + 왼쪽 남색 막대 (시안 A)
+                  <tr
+                    key={unit.id}
+                    className={`border-b border-line focus-within:bg-blue-50 [&:focus-within>th]:shadow-[inset_5px_0_0_var(--color-brand)] ${bill.isTarget ? '' : 'bg-slate-50 text-slate-600'}`}
+                  >
+                    <th scope="row" className="whitespace-nowrap px-3 py-3 text-left font-bold">
                       {unitLabel(unit)}
                       {/* 오리집은 5·6동 두 세대 몫 — 어느 동에서 바꿔도 두 동에 함께 반영된다 (H-22) */}
-                      {bill.shares > 1 && <span className="block text-base font-semibold text-blue-800">{bill.shares}세대분 합계</span>}
+                      {bill.shares > 1 && <span className="block text-base font-semibold text-brand">{bill.shares}세대분 합계</span>}
                     </th>
                     <td className="px-2 text-center">
                       <input
@@ -284,7 +288,7 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
                           disabled={!canPay}
                           onKeyDown={nav(COL.paid)}
                           onClick={() => togglePaid(unit.id, bill)}
-                          className={`min-w-[5rem] whitespace-nowrap rounded-md border-2 px-3 py-1 font-bold focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-60 ${fullyPaid ? PAID_BUTTON_CLASS.paid : PAID_BUTTON_CLASS.unpaid}`}
+                          className={`min-h-11 min-w-[5rem] whitespace-nowrap rounded-xl border-2 px-4 py-1 font-bold focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-60 ${fullyPaid ? PAID_BUTTON_CLASS.paid : PAID_BUTTON_CLASS.unpaid}`}
                         >
                           {fullyPaid ? '완납' : '미납'}
                         </button>
@@ -303,7 +307,7 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
                       {/* 다 낸 세대는 녹색 테두리 — 관리자가 납부 완료를 누를 수 있다는 표시, 관리자 화면에만 (G-15) */}
                       <div
                         title={showConfirmReady ? '청구액을 모두 냈습니다 — 납부 확인을 할 수 있습니다' : undefined}
-                        className={`inline-flex rounded-lg border-4 p-1 ${showConfirmReady ? 'border-green-600 bg-green-50' : 'border-transparent'}`}
+                        className={`inline-flex rounded-xl border-4 p-1 ${showConfirmReady ? 'border-green-600 bg-green-50' : 'border-transparent'}`}
                       >
                         <input
                           ref={register(row, COL.confirm)}

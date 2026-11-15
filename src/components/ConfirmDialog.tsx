@@ -26,7 +26,7 @@ export function ConfirmDialog({ title, children, confirmLabel, danger = false, b
 
   return (
     <div role="dialog" aria-modal="true" aria-labelledby="confirm-title" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-      <div className="w-full max-w-lg rounded-2xl border-2 border-slate-400 bg-white p-8 shadow-xl">
+      <div className="w-full max-w-lg card p-8 shadow-xl">
         <h2 id="confirm-title" className="mb-4 text-2xl font-bold">
           {title}
         </h2>

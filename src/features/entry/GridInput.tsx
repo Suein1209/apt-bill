@@ -52,7 +52,7 @@ export function GridInput({ label, value, draft, disabled, align = 'right', high
         onFocus={(event) => event.currentTarget.select()}
         onBlur={() => void commit()}
         onKeyDown={onNavigate}
-        className={`w-full rounded-md border-2 px-2 py-1 text-lg tabular-nums focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:border-transparent disabled:bg-transparent disabled:text-slate-500 ${
+        className={`w-full rounded-lg border-2 px-2 py-1.5 text-lg tabular-nums focus:outline-none focus:ring-4 focus:ring-blue-300 disabled:border-transparent disabled:bg-transparent disabled:text-slate-500 ${
           align === 'right' ? 'text-right' : 'text-left'
         } ${error ? 'border-red-600 bg-red-50' : dirty ? 'border-amber-500 bg-amber-50' : highlighted ? 'border-purple-500 bg-purple-50' : 'border-slate-400 bg-white'}`}
       />
