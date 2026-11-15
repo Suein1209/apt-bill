@@ -17,13 +17,14 @@ import { NewMonthDialog } from './NewMonthDialog.tsx';
 import { monthAccess } from './monthAccess.ts';
 import { CostEntryScreen } from '../cost/CostEntryScreen.tsx';
 import { UnitGrid } from '../entry/UnitGrid.tsx';
+import { NoticeScreen } from '../print/NoticeScreen.tsx';
 import { PaymentSheetView, type SheetMode } from '../print/PaymentSheetView.tsx';
 import { PrintMenuDialog } from '../print/PrintMenuDialog.tsx';
 import { unitsInDong } from '../../domain/units.ts';
 import type { MonthMap } from '../../services/firestore/monthRepo.ts';
 import type { Unit, UserDoc, YearMonth } from '../../types/bill.ts';
 
-type View = { kind: 'home' } | { kind: 'cost' } | { kind: 'dong'; dong: number } | { kind: 'print'; mode: SheetMode };
+type View = { kind: 'home' } | { kind: 'cost' } | { kind: 'dong'; dong: number } | { kind: 'print'; mode: SheetMode } | { kind: 'notice' };
 
 interface MonthHomeProps {
   auth: Auth;
@@ -63,6 +64,9 @@ export function MonthHome({ auth, db, uid, profile, units, months, monthList, cu
   }
   if (view.kind === 'print') {
     return <PaymentSheetView mode={view.mode} yearMonth={month.yearMonth} units={units} bills={bills} onClose={() => setView({ kind: 'home' })} />;
+  }
+  if (view.kind === 'notice') {
+    return <NoticeScreen month={month} units={units} bills={bills} targetCount={summary.targetCount} onClose={() => setView({ kind: 'home' })} />;
   }
   if (view.kind === 'dong') {
     return (
@@ -133,7 +137,7 @@ export function MonthHome({ auth, db, uid, profile, units, months, monthList, cu
         <PrintMenuDialog
           onSelect={(mode) => {
             setPrintMenuOpen(false);
-            setView({ kind: 'print', mode });
+            setView(mode === 'notice' ? { kind: 'notice' } : { kind: 'print', mode });
           }}
           onCancel={() => setPrintMenuOpen(false)}
         />

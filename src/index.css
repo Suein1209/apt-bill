@@ -124,7 +124,133 @@
   font-weight: 600;
 }
 
+/* ------------------------------------------------------------------ */
+/* 관리비 통지 내역 (P-18 ~ P-20) — A4 세로 한 장에 반쪽 통지서 2개          */
+/* ------------------------------------------------------------------ */
+@page notice {
+  size: A4 portrait;
+  margin: 0;
+}
+
+.notice-page {
+  page: notice;
+  box-sizing: border-box;
+  width: 210mm;
+  height: 297mm;
+  margin: 0 auto 8mm;
+  background: #fff;
+  color: #000;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.25);
+  break-after: page;
+}
+
+.notice {
+  box-sizing: border-box;
+  height: 148.5mm;
+  padding: 12mm 18mm 8mm;
+  display: flex;
+  flex-direction: column;
+  font-size: 12pt;
+}
+
+/* 가운데 자르는 선 */
+.notice + .notice {
+  border-top: 1px dashed #666;
+}
+
+.notice-title {
+  margin: 0 0 4mm;
+  text-align: center;
+  font-size: 17pt;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.notice-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 3mm;
+  padding-bottom: 2mm;
+  border-bottom: 2px solid #000;
+}
+
+.notice-unit {
+  font-size: 15pt;
+}
+
+.notice-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.notice-table th,
+.notice-table td {
+  padding: 1.6mm 3mm;
+  border-bottom: 1px solid #bbb;
+  text-align: left;
+  font-weight: 400;
+}
+
+.notice-table thead th {
+  font-size: 10.5pt;
+  color: #444;
+  border-bottom: 1px solid #000;
+}
+
+.notice-amount {
+  width: 38mm;
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.notice-group th,
+.notice-group td {
+  font-weight: 700;
+  background: #f1f1f1;
+}
+
+.notice-item th {
+  padding-left: 9mm;
+}
+
+.notice-item th,
+.notice-item td {
+  color: #333;
+}
+
+.notice-note {
+  margin-left: 2mm;
+  font-size: 10pt;
+  color: #555;
+}
+
+.notice-total th,
+.notice-total td {
+  padding-top: 2.5mm;
+  border-top: 2px solid #000;
+  border-bottom: 2px solid #000;
+  font-size: 14pt;
+  font-weight: 800;
+}
+
+.notice-footer {
+  margin: auto 0 0;
+  text-align: right;
+  font-size: 9.5pt;
+  color: #555;
+}
+
 @media print {
+  .notice-page {
+    margin: 0;
+    box-shadow: none;
+  }
+
+  .notice-page:last-child {
+    break-after: auto;
+  }
+
   .no-print {
     display: none !important;
   }

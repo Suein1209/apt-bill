@@ -1,20 +1,30 @@
 /**
- * 출력 메뉴 — 납부 확인표 / 납부 금액표 고르기 (P-14)
+ * 출력 메뉴 — 납부 확인표 / 납부 금액표 / 관리비 통지 내역 고르기 (P-14, P-18)
  */
 import { useEffect } from 'react';
-import { ClipboardCheck, Receipt } from 'lucide-react';
+import { ClipboardCheck, FileText, Receipt } from 'lucide-react';
 import { BigButton } from '../../components/BigButton.tsx';
 import { SHEET_TITLES, type SheetMode } from './PaymentSheetView.tsx';
 
+/** 출력 종류 — 납부표 두 가지와 세대별 통지서 */
+export type PrintChoice = SheetMode | 'notice';
+
 interface PrintMenuDialogProps {
-  onSelect: (mode: SheetMode) => void;
+  onSelect: (choice: PrintChoice) => void;
   onCancel: () => void;
 }
 
-const DESCRIPTIONS: Readonly<Record<SheetMode, string>> = {
+const CHOICES: readonly PrintChoice[] = ['check', 'amount', 'notice'];
+
+const TITLES: Readonly<Record<PrintChoice, string>> = { ...SHEET_TITLES, notice: '관리비 통지 내역' };
+
+const DESCRIPTIONS: Readonly<Record<PrintChoice, string>> = {
   check: '세대마다 납부 확인이 끝났는지 ✔ 로 표시합니다.',
   amount: '세대마다 낸 금액과 층·동 합계를 표시합니다.',
+  notice: '고른 세대의 관리비 통지서를 A4 반쪽 크기로 출력합니다.',
 };
+
+const ICONS: Readonly<Record<PrintChoice, typeof FileText>> = { check: ClipboardCheck, amount: Receipt, notice: FileText };
 
 export function PrintMenuDialog({ onSelect, onCancel }: PrintMenuDialogProps) {
   useEffect(() => {
@@ -32,21 +42,24 @@ export function PrintMenuDialog({ onSelect, onCancel }: PrintMenuDialogProps) {
           무엇을 출력할까요?
         </h2>
         <div className="space-y-4">
-          {(['check', 'amount'] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              autoFocus={mode === 'check'}
-              onClick={() => onSelect(mode)}
-              className="flex w-full items-center gap-4 rounded-xl border-4 border-slate-700 bg-white p-5 text-left hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-blue-400"
-            >
-              {mode === 'check' ? <ClipboardCheck className="h-10 w-10 shrink-0" aria-hidden="true" /> : <Receipt className="h-10 w-10 shrink-0" aria-hidden="true" />}
-              <span>
-                <span className="block text-2xl font-extrabold">{SHEET_TITLES[mode]}</span>
-                <span className="block text-lg text-slate-700">{DESCRIPTIONS[mode]}</span>
-              </span>
-            </button>
-          ))}
+          {CHOICES.map((choice) => {
+            const Icon = ICONS[choice];
+            return (
+              <button
+                key={choice}
+                type="button"
+                autoFocus={choice === CHOICES[0]}
+                onClick={() => onSelect(choice)}
+                className="flex w-full items-center gap-4 rounded-xl border-4 border-slate-700 bg-white p-5 text-left hover:bg-slate-100 focus:outline-none focus:ring-4 focus:ring-blue-400"
+              >
+                <Icon className="h-10 w-10 shrink-0" aria-hidden="true" />
+                <span>
+                  <span className="block text-2xl font-extrabold">{TITLES[choice]}</span>
+                  <span className="block text-lg text-slate-700">{DESCRIPTIONS[choice]}</span>
+                </span>
+              </button>
+            );
+          })}
         </div>
         <div className="mt-6 flex justify-end">
           <BigButton variant="secondary" onClick={onCancel}>
