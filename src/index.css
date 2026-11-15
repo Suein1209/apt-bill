@@ -33,7 +33,10 @@
 }
 
 .sheet-title {
-  margin: 0 0 3mm;
+  /* 제목 위·아래 여백 — 표와 떨어뜨려 읽기 쉽게.
+     위쪽은 margin 대신 padding: margin은 바깥으로 겹쳐 나가 인쇄 때 두 번째 장이 생긴다 */
+  margin: 0 0 6mm;
+  padding-top: 3mm;
   text-align: center;
   font-size: 15pt;
   font-weight: 800;
