@@ -10,7 +10,6 @@ import { ArrowLeft } from 'lucide-react';
 import { BigButton } from '../../components/BigButton.tsx';
 import {
   CONFIRMED_LOCKED_MESSAGE,
-  INVALID_AMOUNT_MESSAGE,
   INVALID_USAGE_MESSAGE,
   ROLE_LABELS,
   SAVE_FAILED_PREFIX,
@@ -20,11 +19,9 @@ import {
   formatNumber,
   formatWon,
   formatYearMonth,
-  parseAmountInput,
   parseUsageInput,
   todayISODate,
 } from '../../domain/format.ts';
-import { isValidAmount } from '../../domain/money.ts';
 import { canToggleConfirmed, canTogglePaid, isFullyPaid } from '../../domain/payment.ts';
 import { unitLabel } from '../../domain/unitLabel.ts';
 import { useDraftEntries } from '../../hooks/useDraftEntries.ts';
@@ -35,11 +32,11 @@ import { useGridKeyboard } from './useGridKeyboard.ts';
 import type { Payments } from '../../domain/billing.ts';
 import type { Result } from '../../services/result.ts';
 import type { MonthAccess } from '../month/monthAccess.ts';
-import type { MonthDoc, PaymentDoc, Unit, UnitBill, UserRole, Won } from '../../types/bill.ts';
+import type { MonthDoc, PaymentDoc, Unit, UnitBill, UserRole } from '../../types/bill.ts';
 
 /** 키보드로 이동하는 칸의 열 번호 */
-const COL = { vacant: 0, usage: 1, water: 2, paid: 3, confirm: 4 } as const;
-const COL_COUNT = 5;
+const COL = { vacant: 0, usage: 1, paid: 2, confirm: 3 } as const;
+const COL_COUNT = 4;
 
 const HEADERS = ['세대', '공실', '수도 사용량(리터)', '수도 요금', '이번 달 관리비', '이월 미납', '청구액', '납부 상태', '납부일', '납부 확인'] as const;
 
@@ -49,11 +46,11 @@ const PAID_BUTTON_CLASS = {
   paid: 'border-lime-600 bg-lime-300 text-lime-950 hover:bg-lime-400',
 } as const;
 
-/** 입력할 수 있는 칸 — 이번 달 관리비·납부일은 보기 전용 (G-17, G-19), 납부는 버튼 (G-20) */
-type DraftField = 'usage' | 'water';
+/** 입력할 수 있는 칸 — 수도 사용량뿐. 수도 요금은 사용량 × 단가로 계산해 보여 준다 (F-17) */
+type DraftField = 'usage';
 
 /** 복구 순서 */
-const DRAFT_FIELDS: readonly DraftField[] = ['usage', 'water'];
+const DRAFT_FIELDS: readonly DraftField[] = ['usage'];
 
 /** 납부일 칸 — 첫 줄 납부 시각(24시간제), 둘째 줄 완납으로 바꾼 계정 (G-20). 예전 자료는 날짜만 */
 function paidInfo(payment: PaymentDoc | undefined): { when: string; who: string } | null {
@@ -104,11 +101,6 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
     return result;
   };
 
-  const parseWonText = (text: string): Won | null => {
-    const amount = parseAmountInput(text) ?? 0;
-    return isValidAmount(amount) ? amount : null;
-  };
-
   /**
    * 칸 하나를 저장 — 임시저장 복구에도 같은 함수를 쓴다.
    * 그 칸의 필드만 저장해 같은 세대의 다른 칸을 옛값으로 덮지 않는다 (G1).
@@ -118,23 +110,13 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
     const key = cellKey(unitId, field);
     const bill = billById.get(unitId);
     // 납부 확인된 세대는 수도를 고칠 수 없다 (G-18) — 임시저장 복구로 들어와도 막는다
-    if ((field === 'usage' || field === 'water') && bill?.isConfirmed) {
+    if (bill?.isConfirmed) {
       drafts.clear(key);
       return CONFIRMED_LOCKED_MESSAGE;
     }
-
-    switch (field) {
-      case 'usage': {
-        const usage = parseUsageInput(text);
-        if (usage === null) return INVALID_USAGE_MESSAGE;
-        return drafts.commit(key, track(saveWaterField(db, ym, unitId, 'usage', usage, uid)));
-      }
-      case 'water': {
-        const amount = parseWonText(text);
-        if (amount === null) return INVALID_AMOUNT_MESSAGE;
-        return drafts.commit(key, track(saveWaterField(db, ym, unitId, 'amount', amount, uid)));
-      }
-    }
+    const usage = parseUsageInput(text);
+    if (usage === null) return INVALID_USAGE_MESSAGE;
+    return drafts.commit(key, track(saveWaterField(db, ym, unitId, field, usage, uid)));
   };
 
   /** 미납 → 완납이면 청구액 전액·지금 시각·내 역할을 저장하고, 완납 → 미납이면 모두 지운다 (G-20) */
@@ -233,7 +215,7 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
                 // 납부 완료 가능 표시는 관리자에게만 (관리소장은 납부 완료를 누를 수 없다)
                 const showConfirmReady = isAdmin && fullyPaid;
                 const canWater = access.canEdit && bill.isTarget && unit.kind === 'residential' && !bill.isConfirmed;
-                const autoBase = bill.primaryShare + bill.secondaryShare + bill.water;
+                const autoBase = bill.primaryShare + bill.water;
                 const nav = (col: number) => (event: Parameters<typeof onKeyDown>[0]) => onKeyDown(event, row, col);
                 const draftOf = (field: DraftField) => draft[cellKey(unit.id, field)];
                 const draftHandler = (field: DraftField) => (text: string) => drafts.set(cellKey(unit.id, field), text);
@@ -270,17 +252,9 @@ export function UnitGrid({ db, uid, role, dong, month, units, bills, payments, a
                         onCommit={commitHandler('usage')}
                       />
                     </td>
-                    <td className="w-32 px-1">
-                      <GridInput
-                        label={`${unitLabel(unit)} 수도 요금`}
-                        value={water?.amount == null ? '' : formatNumber(water.amount)}
-                        draft={draftOf('water')}
-                        disabled={!canWater}
-                        inputRef={register(row, COL.water)}
-                        onNavigate={nav(COL.water)}
-                        onDraft={draftHandler('water')}
-                        onCommit={commitHandler('water')}
-                      />
+                    {/* 수도 요금 — 보기 전용, 사용량 × 수도 단가 (F-17) */}
+                    <td className="whitespace-nowrap px-2 text-right tabular-nums">
+                      {unit.kind === 'residential' && water?.usage != null ? formatNumber(bill.water) : ''}
                     </td>
                     {/* 이번 달 관리비 — 보기 전용 (G-17) */}
                     <td className="whitespace-nowrap px-2 text-right tabular-nums">

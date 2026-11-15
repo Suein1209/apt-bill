@@ -3,7 +3,8 @@
  * Design Ref: §3.4 — 저장된 입력값으로 분배·청구·이월을 매번 계산한다
  * Plan SC: SC-2(계산 규칙 일치), SC-5(이전 달 수정 → 이월 자동 반영)
  */
-import { ceilToUnit, ceilWon, floorDiv, sum } from './money.ts';
+import { WATER_RATE_KEY } from '../constants/feeItems.ts';
+import { ceilToUnit, ceilWon, sum } from './money.ts';
 import { prevYearMonth } from './yearMonth.ts';
 import { unitsInDong } from './units.ts';
 import type {
@@ -63,7 +64,27 @@ export function sumSecondary(categories: readonly SecondaryCategory[]): Won {
   return sum(categories.flatMap((category) => category.items.map((item) => item.amount)));
 }
 
-/** 1차·2차 합계와 세대당 분배액 (F-14, P-12) */
+/** 공용 비용 한 항목을 나누는 세대 수로 나눈 1세대 몫 — 1원 자리 올림(10원 단위) (F-19) */
+export function perShare(amount: Won, targetCount: number): Won {
+  return targetCount > 0 ? ceilToUnit(amount, targetCount) : 0;
+}
+
+/**
+ * 세대당 금액 = (인건비 ÷ N) + (공동 전기요금 ÷ N) + (유지비 ÷ N), 항목마다 1원 자리 올림 (F-18, F-19).
+ * 수도 단가 줄 금액은 나누지 않는다 — 세대마다 사용량 × 단가로 따로 낸다 (F-17)
+ */
+export function perUnitShareOf(month: MonthDoc, targetCount: number): Won {
+  return sum(
+    Object.entries(month.primaryCosts)
+      .filter(([key]) => key !== WATER_RATE_KEY)
+      .map(([, amount]) => perShare(amount, targetCount)),
+  );
+}
+
+/**
+ * 공용 비용·유지비 지출 합계와 세대당 분배액 (F-14, P-12).
+ * 세대당 금액은 공용 비용만 나눈다 — 유지비 지출 내역은 합계만 보여 준다 (F-18)
+ */
 export function summarizeMonth(units: readonly Unit[], month: MonthDoc): MonthSummary {
   const primaryTotal = sumPrimary(month);
   const secondaryTotal = sumSecondary(month.secondaryCategories);
@@ -72,17 +93,42 @@ export function summarizeMonth(units: readonly Unit[], month: MonthDoc): MonthSu
     primaryTotal,
     secondaryTotal,
     targetCount,
-    perUnitShare: targetCount > 0 ? floorDiv(primaryTotal + secondaryTotal, targetCount) : 0,
+    perUnitShare: perUnitShareOf(month, targetCount),
   };
+}
+
+/* ------------------------------------------------------------------ */
+/* 수도 단가 · 세대별 수도 요금                                           */
+/* ------------------------------------------------------------------ */
+
+/** 사용량(리터, 소수 첫째 자리까지)을 0.1리터 단위 정수로 — 곱셈·나눗셈을 정수로 하려고 */
+const toTenths = (liters: number): number => Math.round(liters * 10);
+
+/**
+ * 수도 단가 — 수도 금액 ÷ 총 사용량을 1원 자리 올림한 리터당 금액 (F-17, F-19).
+ * 예: 10,000원 ÷ 3,000리터 = 3.33원 → 리터당 10원. 금액이나 총 사용량이 0이면 단가 없음
+ */
+export function waterRate(month: MonthDoc): { amount: Won; totalUsage: number; perLiter: Won } | null {
+  const amount = month.primaryCosts.commonWater;
+  const totalUsage = month.waterTotalUsage ?? 0;
+  if (amount <= 0 || toTenths(totalUsage) <= 0) return null;
+  return { amount, totalUsage, perLiter: ceilToUnit(amount * 10, toTenths(totalUsage)) };
+}
+
+/** 세대 수도 요금 = 사용량 × 리터당 단가, 1원 자리 올림 — 예: 12.3리터 × 10원 = 123원 → 130원 (F-17, F-19) */
+export function waterFee(usage: number | null, month: MonthDoc): Won {
+  const rate = waterRate(month);
+  if (!rate || usage === null || usage <= 0) return 0;
+  return ceilToUnit(toTenths(usage) * rate.perLiter, 10);
 }
 
 /* ------------------------------------------------------------------ */
 /* 세대별 청구액                                                         */
 /* ------------------------------------------------------------------ */
 
-/** 수도 요금 — 주거 세대만 (F-3) */
+/** 수도 요금 — 주거 세대만 (F-3, F-17) */
 function waterAmount(unit: Unit, month: MonthDoc): Won {
-  return unit.kind === 'residential' ? (month.water[unit.id]?.amount ?? 0) : 0;
+  return unit.kind === 'residential' ? waterFee(month.water[unit.id]?.usage ?? null, month) : 0;
 }
 
 /**
@@ -90,11 +136,12 @@ function waterAmount(unit: Unit, month: MonthDoc): Won {
  *
  * 부과 대상 u (몫 w = shareCount, 오리집 2·나머지 1):
  *   직접 수정 있음  charged = ceil10(override + carry)                              (C-14, C-15)
- *   없음            charged = ceil10((P + S)·w/N + water + carry)
- *                          = ceil((w·(P + S) + N·(water + carry)) / (10·N)) × 10   (C-5, C-11)
+ *   없음            charged = ceil10(w·share + water + carry)                         (C-5, C-11)
+ *   share = Σ ceil10(인건비·공동 전기요금·유지비 ÷ N) — 세대당 금액, 화면 표시와 같은 값 (F-19)
+ *           수도 단가 줄 금액과 유지비 지출 내역은 나누지 않는다                    (F-17, F-18)
+ *   water = 사용량 × 리터당 단가(1원 자리 올림), 1원 자리 올림                      (F-17, F-19)
  * 부과 대상 아님(공실): 이번 달 관리비 없이 이월 미납만 청구                     (Design §12 Q4)
  * 관리실: 나누지도 내지도 않는다. 청구·이월·직접 수정 없음                         (H-26)
- * 표시용 분배액은 원 미만 버림 (C-13)
  */
 export function computeBills(
   units: readonly Unit[],
@@ -102,10 +149,8 @@ export function computeBills(
   payments: Payments,
   carryOvers: CarryOvers,
 ): UnitBill[] {
-  const primaryTotal = sumPrimary(month);
-  const secondaryTotal = sumSecondary(month.secondaryCategories);
   const targetCount = countTargets(units, month);
-  const sharedTotal = primaryTotal + secondaryTotal;
+  const unitShare = perUnitShareOf(month, targetCount);
 
   return units.map((unit) => {
     const exempt = isExempt(unit);
@@ -122,7 +167,7 @@ export function computeBills(
     } else if (override !== null) {
       charged = ceilWon(override + carryOver);
     } else {
-      charged = ceilToUnit(shares * sharedTotal + targetCount * (water + carryOver), targetCount);
+      charged = ceilWon(shares * unitShare + water + carryOver);
     }
 
     const paid = exempt ? 0 : (payment?.paidAmount ?? 0);
@@ -131,8 +176,7 @@ export function computeBills(
       isTarget,
       exempt,
       shares,
-      primaryShare: isTarget ? floorDiv(primaryTotal * shares, targetCount) : 0,
-      secondaryShare: isTarget ? floorDiv(secondaryTotal * shares, targetCount) : 0,
+      primaryShare: isTarget ? shares * unitShare : 0,
       water,
       override,
       carryOver,

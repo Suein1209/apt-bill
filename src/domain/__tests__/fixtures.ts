@@ -11,6 +11,7 @@ export function makeMonth(yearMonth: YearMonth, patch: Partial<MonthDoc> = {}): 
     secondaryCategories: [],
     vacant: {},
     water: {},
+    waterTotalUsage: null,
     overrides: {},
     notice: '',
     closing: null,

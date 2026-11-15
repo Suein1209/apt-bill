@@ -102,11 +102,11 @@ describe('로그인·역할 (U-4)', () => {
 
 describe('관리소장 — 월 문서 (U-7, U-13, U-15)', () => {
   it('#3 현재 달 수도 입력은 허용', async () => {
-    await assertSucceeds(updateDoc(doc(db(MANAGER), 'months', CURRENT), { 'water.R201': { usage: 10, amount: 15_000 } }));
+    await assertSucceeds(updateDoc(doc(db(MANAGER), 'months', CURRENT), { 'water.R201': { usage: 10 } }));
   });
 
   it('#4 이전 달 수도 입력은 거부', async () => {
-    await assertFails(updateDoc(doc(db(MANAGER), 'months', PREVIOUS), { 'water.R201': { usage: 10, amount: 15_000 } }));
+    await assertFails(updateDoc(doc(db(MANAGER), 'months', PREVIOUS), { 'water.R201': { usage: 10 } }));
   });
 
   it('#5 현재 달 결산(status 변경)은 거부', async () => {
@@ -153,11 +153,11 @@ describe('관리자 (U-9, U-14, D-6, D-8)', () => {
   });
 
   it('이전 달(미결산) 수정은 허용', async () => {
-    await assertSucceeds(updateDoc(doc(db(ADMIN), 'months', PREVIOUS), { 'water.R201': { usage: 1, amount: 100 } }));
+    await assertSucceeds(updateDoc(doc(db(ADMIN), 'months', PREVIOUS), { 'water.R201': { usage: 1 } }));
   });
 
   it('#10 결산된 달 수도 수정은 거부', async () => {
-    await assertFails(updateDoc(doc(db(ADMIN), 'months', CLOSED), { 'water.R201': { usage: 1, amount: 100 } }));
+    await assertFails(updateDoc(doc(db(ADMIN), 'months', CLOSED), { 'water.R201': { usage: 1 } }));
   });
 
   it('#11 결산 취소는 허용', async () => {
@@ -203,9 +203,9 @@ describe('관리소장 — 앱이 쓰는 형태 그대로 (merge 저장)', () =>
 });
 
 describe('관리소장 — 수도 칸 단위 저장 (G1)', () => {
-  it('water.{세대}.amount 필드 경로 저장은 허용, 이전 달은 거부', async () => {
-    await assertSucceeds(updateDoc(doc(db(MANAGER), 'months', CURRENT), { 'water.R201.amount': 15_000, updatedAt: 't', updatedBy: MANAGER }));
+  it('water.{세대}.usage 필드 경로·수도 총 사용량 저장은 허용, 이전 달은 거부 (F-17)', async () => {
     await assertSucceeds(updateDoc(doc(db(MANAGER), 'months', CURRENT), { 'water.R201.usage': 12, updatedAt: 't', updatedBy: MANAGER }));
-    await assertFails(updateDoc(doc(db(MANAGER), 'months', PREVIOUS), { 'water.R201.amount': 15_000 }));
+    await assertSucceeds(updateDoc(doc(db(MANAGER), 'months', CURRENT), { waterTotalUsage: 3_000, updatedAt: 't', updatedBy: MANAGER }));
+    await assertFails(updateDoc(doc(db(MANAGER), 'months', PREVIOUS), { 'water.R201.usage': 12 }));
   });
 });

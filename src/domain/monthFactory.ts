@@ -15,9 +15,9 @@ function cloneCategories(categories: readonly SecondaryCategory[]): SecondaryCat
 }
 
 /**
- * 이어받음: 공실 체크, 기본 공통 비용(1차) 금액, 추가 공통 비용(2차) 카테고리·항목(금액 포함), 안내문, (선택) 수도
+ * 이어받음: 공실 체크, 공용 비용 금액·수도 총 사용량, 유지비 지출 내역 카테고리·항목(금액 포함), 안내문, (선택) 세대별 수도 사용량
  * 새로 시작: 직접 수정 없음, 결산 없음
- * 첫 달(previous = null): 기본 공통 비용 0원, 추가 공통 비용 기본 카테고리 (F-6)
+ * 첫 달(previous = null): 공용 비용 0원, 유지비 지출 내역 기본 카테고리 (F-6)
  */
 export function createMonthDoc(
   yearMonth: YearMonth,
@@ -33,6 +33,7 @@ export function createMonthDoc(
     secondaryCategories: cloneCategories(previous?.secondaryCategories ?? DEFAULT_SECONDARY_CATEGORIES),
     vacant: { ...(previous?.vacant ?? {}) },
     water: options.copyWater && previous ? structuredClone(previous.water) : {},
+    waterTotalUsage: previous?.waterTotalUsage ?? null,
     overrides: {},
     notice: previous?.notice ?? '',
     closing: null,

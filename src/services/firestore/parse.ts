@@ -99,10 +99,10 @@ const parseTrue = (value: unknown): true | null => (value === true ? true : null
 function parseWater(value: unknown): WaterEntry | null {
   if (!isRecord(value)) return null;
   // 입력하지 않은 칸은 null 로 둔다 — 화면에 "0"으로 보이지 않게
+  // 예전 자료의 세대별 수도 요금(amount)은 읽지 않는다 — 요금은 사용량 × 단가로 계산 (F-17)
   const usage = value.usage ?? null;
-  const amount = value.amount ?? null;
-  if ((usage !== null && typeof usage !== 'number') || (amount !== null && !isInt(amount))) return null;
-  return { usage, amount };
+  if (usage !== null && typeof usage !== 'number') return null;
+  return { usage };
 }
 
 function parsePrimaryCosts(data: unknown): Record<PrimaryFeeKey, Won> | null {
@@ -156,6 +156,7 @@ export function parseMonthDoc(id: string, data: unknown): MonthDoc | null {
     secondaryCategories,
     vacant,
     water,
+    waterTotalUsage: typeof data.waterTotalUsage === 'number' && data.waterTotalUsage >= 0 ? data.waterTotalUsage : null,
     overrides,
     notice: typeof data.notice === 'string' ? data.notice : '',
     closing,

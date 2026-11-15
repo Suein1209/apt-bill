@@ -11,12 +11,18 @@ const base = {
 };
 
 describe('월 문서 읽기', () => {
-  it('수도 사용량·요금 중 한쪽만 저장돼 있어도 읽는다 (G1)', () => {
-    const month = parseMonthDoc('2026-11', { ...base, water: { R201: { amount: 15_000 }, R202: { usage: 12 } } });
-    expect(month?.water).toEqual({ R201: { usage: null, amount: 15_000 }, R202: { usage: 12, amount: null } });
+  it('예전 자료의 세대별 수도 요금은 읽지 않고 사용량만 읽는다 (F-17)', () => {
+    const month = parseMonthDoc('2026-11', { ...base, water: { R201: { amount: 15_000 }, R202: { usage: 12, amount: 9_000 } } });
+    expect(month?.water).toEqual({ R201: { usage: null }, R202: { usage: 12 } });
   });
 
-  it('금액이 정수가 아니면 형식 오류', () => {
-    expect(parseMonthDoc('2026-11', { ...base, water: { R201: { amount: 10.5 } } })).toBeNull();
+  it('수도 총 사용량 — 없거나 음수면 null', () => {
+    expect(parseMonthDoc('2026-11', { ...base, waterTotalUsage: 3_000 })?.waterTotalUsage).toBe(3_000);
+    expect(parseMonthDoc('2026-11', base)?.waterTotalUsage).toBeNull();
+    expect(parseMonthDoc('2026-11', { ...base, waterTotalUsage: -1 })?.waterTotalUsage).toBeNull();
+  });
+
+  it('사용량이 숫자가 아니면 형식 오류', () => {
+    expect(parseMonthDoc('2026-11', { ...base, water: { R201: { usage: '12' } } })).toBeNull();
   });
 });

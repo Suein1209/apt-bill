@@ -8,12 +8,14 @@ const PREFIX = 'cost';
 
 export type CostDraftTarget =
   | { kind: 'primary'; key: PrimaryFeeKey }
+  | { kind: 'waterTotalUsage' }
   | { kind: 'categoryName'; categoryId: string }
   | { kind: 'itemName'; categoryId: string; itemId: string }
   | { kind: 'itemAmount'; categoryId: string; itemId: string };
 
 export const costDraftKey = {
   primary: (key: PrimaryFeeKey) => `${PREFIX}|primary|${key}`,
+  waterTotalUsage: `${PREFIX}|waterTotalUsage|month`,
   categoryName: (categoryId: string) => `${PREFIX}|categoryName|${categoryId}`,
   itemName: (itemId: string) => `${PREFIX}|itemName|${itemId}`,
   itemAmount: (itemId: string) => `${PREFIX}|itemAmount|${itemId}`,
@@ -29,6 +31,7 @@ export function resolveCostDraftKey(key: string, categories: readonly SecondaryC
     const item = PRIMARY_FEE_ITEMS.find((candidate) => candidate.key === id);
     return item ? { kind: 'primary', key: item.key } : null;
   }
+  if (kind === 'waterTotalUsage') return { kind };
   if (kind === 'categoryName') return categories.some((category) => category.id === id) ? { kind, categoryId: id } : null;
   if (kind === 'itemName' || kind === 'itemAmount') {
     const category = categories.find((candidate) => candidate.items.some((item) => item.id === id));

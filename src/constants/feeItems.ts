@@ -3,11 +3,11 @@
  */
 import type { PrimaryFeeItem, PrimaryFeeKey, SecondaryCategory, Won } from '../types/bill.ts';
 
-/** 1차 항목(공통 비용) — 고정 4개, 화면에서 바꾸지 않는다 (F-7) */
+/** 공용 비용 항목 — 고정 4개, 화면에서 바꾸지 않는다 (F-7). 세대당 금액은 수도 단가를 뺀 세 항목만 나눈다 (F-18) */
 export const PRIMARY_FEE_ITEMS = [
   { key: 'labor', label: '인건비' },
   { key: 'commonElectricity', label: '공동 전기요금' },
-  { key: 'commonWater', label: '공동 수도요금' },
+  { key: 'commonWater', label: '수도 단가' },
   { key: 'maintenance', label: '유지비' },
 ] as const satisfies readonly PrimaryFeeItem[];
 
@@ -19,8 +19,11 @@ export const EMPTY_PRIMARY_COSTS: Readonly<Record<PrimaryFeeKey, Won>> = {
   maintenance: 0,
 };
 
+/** 수도 단가 줄 — 금액과 총 사용량을 함께 입력한다 (F-17) */
+export const WATER_RATE_KEY = 'commonWater' satisfies PrimaryFeeKey;
+
 /**
- * 2차 기본 카테고리·항목 (F-6) — 첫 달에만 쓰고, 이후는 지난달 목록을 이어받는다 (F-9)
+ * 유지비 지출 내역 기본 카테고리·항목 (F-6) — 세대당 금액 계산에는 넣지 않는다 (F-18) — 첫 달에만 쓰고, 이후는 지난달 목록을 이어받는다 (F-9)
  */
 export const DEFAULT_SECONDARY_CATEGORIES: readonly SecondaryCategory[] = [
   {

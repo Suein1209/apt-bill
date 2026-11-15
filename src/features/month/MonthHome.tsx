@@ -103,10 +103,10 @@ export function MonthHome({ auth, db, uid, profile, units, months, monthList, cu
             {access.canEdit ? '이번 달 비용 입력' : '비용 보기'}
           </BigButton>
           <span className="text-xl">
-            기본 공통 비용 <strong className="tabular-nums">{formatWon(summary.primaryTotal)}</strong>
+            공용 비용 <strong className="tabular-nums">{formatWon(summary.primaryTotal)}</strong>
           </span>
           <span className="text-xl">
-            추가 공통 비용 <strong className="tabular-nums">{formatWon(summary.secondaryTotal)}</strong>
+            유지비 지출 <strong className="tabular-nums">{formatWon(summary.secondaryTotal)}</strong>
           </span>
           <span className="text-xl">
             세대당 <strong className="tabular-nums">{formatWon(summary.perUnitShare)}</strong>

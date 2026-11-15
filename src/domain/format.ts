@@ -1,4 +1,4 @@
-import type { YearMonth } from '../types/bill.ts';
+import type { Won, YearMonth } from '../types/bill.ts';
 
 const WON_FORMAT = new Intl.NumberFormat('ko-KR');
 
@@ -34,6 +34,11 @@ export function todayISODate(now: Date = new Date()): string {
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
   return `${now.getFullYear()}-${month}-${day}`;
+}
+
+/** 올림 전 수도 단가 "3.33원" — 소수 둘째 자리까지, 올림 근거 표시용 (F-17) */
+export function formatRawWaterRate(amount: Won, totalUsage: number): string {
+  return `${(amount / totalUsage).toLocaleString('ko-KR', { maximumFractionDigits: 2 })}원`;
 }
 
 /** 날짜·시각 "YYYY-MM-DD HH:mm" (24시간제, 이 기기 시간대) — 납부 시각 표시 (G-20) */

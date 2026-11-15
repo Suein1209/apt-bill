@@ -113,9 +113,9 @@ export interface SecondaryCategory {
 
 /** 세대별 수도 — 이번 달 사용량과 요금을 직접 입력 (F-11, F-12) */
 /** 수도 — 칸마다 따로 저장하므로 한쪽만 입력돼 있을 수 있다 (입력 안 함 = null, 요금은 계산 때 0원) */
+/** 세대별 수도 — 사용량(리터)만 입력하고, 요금은 사용량 × 수도 단가로 계산한다 (F-17) */
 export interface WaterEntry {
   usage: number | null;
-  amount: Won | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -142,6 +142,8 @@ export interface MonthDoc {
   vacant: Record<UnitId, true>;
   /** 주거 세대별 수도 (F-3) */
   water: Record<UnitId, WaterEntry>;
+  /** 수도 단가 계산용 총 사용량(리터) — 단가 = 공용 비용의 수도 금액 ÷ 총 사용량 (F-17) */
+  waterTotalUsage: number | null;
   /** 직접 수정한 '이번 달 관리비'(이월 제외) (C-6, Design §12 Q3) */
   overrides: Record<UnitId, Won>;
   /** 고지서 안내문 (P-3 자리) */
@@ -181,11 +183,9 @@ export interface UnitBill {
   exempt: boolean;
   /** 몇 세대 몫인지 — 오리집 2, 관리실 0, 나머지 1 (H-22) */
   shares: number;
-  /** 1차 분배액, 표시용 원 미만 버림 (C-13) */
+  /** 공용 비용 분배액 = 세대당 금액 × 몫 (F-19) */
   primaryShare: Won;
-  /** 2차 분배액, 표시용 원 미만 버림 (C-13) */
-  secondaryShare: Won;
-  /** 수도 요금 (주거 부과 대상만) */
+  /** 수도 요금 = 사용량 × 수도 단가, 원 미만 올림 (주거 부과 대상만, F-17) */
   water: Won;
   /** 직접 수정한 이번 달 관리비. 직접 수정하지 않았으면 null */
   override: Won | null;
@@ -204,7 +204,7 @@ export interface MonthSummary {
   primaryTotal: Won;
   secondaryTotal: Won;
   targetCount: number;
-  /** 세대당 분배액 (1차+2차), 원 미만 버림 */
+  /** 세대당 금액 — 공용 비용 항목별 몫을 10원 올림해 더한 값 (F-18, F-19) */
   perUnitShare: Won;
 }
 

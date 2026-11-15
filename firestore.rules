@@ -38,7 +38,7 @@ service cloud.firestore {
 
     // 월 문서에서 관리소장이 바꿀 수 있는 필드 (U-6, U-12) — status·closing(U-13)과 공실(G-21)은 관리자 전용
     function managerMonthFields() {
-      return ['primaryCosts', 'secondaryCategories', 'water', 'overrides', 'notice', 'updatedAt', 'updatedBy'];
+      return ['primaryCosts', 'secondaryCategories', 'water', 'waterTotalUsage', 'overrides', 'notice', 'updatedAt', 'updatedBy'];
     }
 
     // 결산·결산 취소 때 바뀌는 필드 (D-6, D-8)

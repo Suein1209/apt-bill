@@ -1,16 +1,18 @@
 /**
- * 이번 달 비용 입력 — 기본 공통 비용(1차) 4칸 + 추가 공통 비용(2차) 카테고리·항목 + 합계 (F-1 ~ F-15, P-12 미리보기)
+ * 이번 달 비용 입력 — 공용 비용 4칸(수도 단가 줄 포함) + 유지비 지출 내역 카테고리·항목 + 합계 (F-1 ~ F-18, P-12 미리보기)
+ * 세대당 금액은 공용 비용만 나눈다. 유지비 지출 내역은 합계만 보여 준다 (F-18)
  */
 import { useState } from 'react';
 import type { Firestore } from 'firebase/firestore';
 import { ArrowLeft } from 'lucide-react';
 import { BigButton } from '../../components/BigButton.tsx';
-import { MoneyInput } from '../../components/MoneyInput.tsx';
-import { PRIMARY_FEE_ITEMS } from '../../constants/feeItems.ts';
-import { formatWon, formatYearMonth, parseAmountInput } from '../../domain/format.ts';
+import { MoneyInput, UsageInput } from '../../components/MoneyInput.tsx';
+import { PRIMARY_FEE_ITEMS, WATER_RATE_KEY } from '../../constants/feeItems.ts';
+import { perShare, waterRate } from '../../domain/billing.ts';
+import { formatRawWaterRate, formatWon, formatYearMonth, parseAmountInput, parseUsageInput } from '../../domain/format.ts';
 import { isValidAmount } from '../../domain/money.ts';
 import { useDraftEntries } from '../../hooks/useDraftEntries.ts';
-import { savePrimaryCost, updateSecondary } from '../../services/firestore/monthRepo.ts';
+import { savePrimaryCost, saveWaterTotalUsage, updateSecondary } from '../../services/firestore/monthRepo.ts';
 import { costDraftKey, isCostDraftKey, resolveCostDraftKey } from './costDraft.ts';
 import { SecondaryEditor } from './SecondaryEditor.tsx';
 import type { MonthAccess } from '../month/monthAccess.ts';
@@ -37,6 +39,12 @@ export function CostEntryScreen({ db, uid, month, summary, access, onBack }: Cos
       const target = resolveCostDraftKey(key, month.secondaryCategories);
       if (text === undefined || target === null) {
         drafts.clear(key);
+        continue;
+      }
+      if (target.kind === 'waterTotalUsage') {
+        const usage = parseUsageInput(text);
+        if (usage === null) continue;
+        await drafts.commit(key, saveWaterTotalUsage(db, month.yearMonth, usage, uid));
         continue;
       }
       if (target.kind === 'primary' || target.kind === 'itemAmount') {
@@ -116,32 +124,81 @@ export function CostEntryScreen({ db, uid, month, summary, access, onBack }: Cos
           <h2 id="totals" className="sr-only">
             합계
           </h2>
-          <Stat label="기본 공통 비용 합계" value={formatWon(summary.primaryTotal)} />
-          <Stat label="추가 공통 비용 합계" value={formatWon(summary.secondaryTotal)} />
+          <Stat label="공용 비용 합계" value={formatWon(summary.primaryTotal)} />
+          <Stat label="유지비 지출 합계 (나누지 않음)" value={formatWon(summary.secondaryTotal)} />
           <Stat label="나누는 세대 (오리집 2세대, 관리실 제외)" value={`${summary.targetCount}세대`} />
-          <Stat label="세대당 금액" value={formatWon(summary.perUnitShare)} />
+          <Stat label="세대당 금액 (인건비·전기·유지비 ÷ 세대)" value={formatWon(summary.perUnitShare)} />
         </section>
 
         <section aria-labelledby="primary" className="rounded-2xl border-2 border-slate-300 bg-white p-6">
-          <SectionTitle id="primary" title="기본 공통 비용" total={summary.primaryTotal} />
+          <SectionTitle id="primary" title="공용 비용" total={summary.primaryTotal} />
           <div className="grid gap-5 md:grid-cols-2">
-            {PRIMARY_FEE_ITEMS.map(({ key, label }) => (
-              <MoneyInput
-                key={key}
-                id={`primary-${key}`}
-                label={label}
-                value={month.primaryCosts[key]}
-                disabled={!access.canEdit}
-                draft={drafts.entries[costDraftKey.primary(key)]}
-                onDraft={(text) => drafts.set(costDraftKey.primary(key), text)}
-                onCommit={(amount) => drafts.commit(costDraftKey.primary(key), savePrimaryCost(db, month.yearMonth, key, amount, uid))}
-              />
-            ))}
+            {PRIMARY_FEE_ITEMS.map(({ key, label }) => {
+              const moneyProps = {
+                value: month.primaryCosts[key],
+                disabled: !access.canEdit,
+                draft: drafts.entries[costDraftKey.primary(key)],
+                onDraft: (text: string) => drafts.set(costDraftKey.primary(key), text),
+                onCommit: (amount: Won) => drafts.commit(costDraftKey.primary(key), savePrimaryCost(db, month.yearMonth, key, amount, uid)),
+              };
+              if (key === WATER_RATE_KEY) {
+                // 수도 단가 — [금액] 원 / [총 사용량] 리터. 금액은 세대로 나누지 않고 단가 계산에만 쓴다 (F-17)
+                const rate = waterRate(month);
+                return (
+                  <fieldset key={key} className="flex flex-col gap-1 md:col-span-2">
+                    <legend className="text-lg font-semibold text-slate-900">{label}</legend>
+                    <div className="flex flex-wrap items-start gap-3">
+                      <div className="min-w-[12rem] flex-1">
+                        <MoneyInput id={`primary-${key}`} label={`${label} 금액`} labelHidden {...moneyProps} />
+                      </div>
+                      <span className="pt-2 text-2xl font-bold text-slate-700" aria-hidden="true">
+                        /
+                      </span>
+                      <div className="min-w-[12rem] flex-1">
+                        <UsageInput
+                          id="water-total-usage"
+                          label={`${label} 총 사용량`}
+                          labelHidden
+                          value={month.waterTotalUsage}
+                          disabled={!access.canEdit}
+                          draft={drafts.entries[costDraftKey.waterTotalUsage]}
+                          onDraft={(text) => drafts.set(costDraftKey.waterTotalUsage, text)}
+                          onCommit={(usage) => drafts.commit(costDraftKey.waterTotalUsage, saveWaterTotalUsage(db, month.yearMonth, usage, uid))}
+                        />
+                      </div>
+                    </div>
+                    <p className="text-lg text-slate-700">
+                      {rate ? (
+                        <>
+                          수도 단가 <strong className="tabular-nums text-slate-900">리터당 {formatWon(rate.perLiter)}</strong>
+                          <span className="text-slate-600"> (계산 {formatRawWaterRate(rate.amount, rate.totalUsage)}, 1원 자리 올림)</span> · 세대별 수도 요금 = 사용량 × 단가
+                        </>
+                      ) : (
+                        '금액과 총 사용량을 넣으면 리터당 단가가 계산됩니다.'
+                      )}
+                    </p>
+                  </fieldset>
+                );
+              }
+              return (
+                <MoneyInput
+                  key={key}
+                  id={`primary-${key}`}
+                  label={label}
+                  hint={
+                    <>
+                      세대당 <strong className="tabular-nums">{formatWon(perShare(month.primaryCosts[key], summary.targetCount))}</strong>
+                    </>
+                  }
+                  {...moneyProps}
+                />
+              );
+            })}
           </div>
         </section>
 
         <section aria-labelledby="secondary">
-          <SectionTitle id="secondary" title="추가 공통 비용" total={summary.secondaryTotal} />
+          <SectionTitle id="secondary" title="유지비 지출 내역" total={summary.secondaryTotal} note="세대당 금액 계산에는 넣지 않습니다." />
           <SecondaryEditor db={db} uid={uid} yearMonth={month.yearMonth} categories={month.secondaryCategories} canEdit={access.canEdit} drafts={drafts} />
         </section>
       </main>
@@ -150,7 +207,7 @@ export function CostEntryScreen({ db, uid, month, summary, access, onBack }: Cos
 }
 
 /** 구역 제목과 그 바로 아래 합계 */
-function SectionTitle({ id, title, total }: { id: string; title: string; total: Won }) {
+function SectionTitle({ id, title, total, note }: { id: string; title: string; total: Won; note?: string }) {
   return (
     <div className="mb-4">
       <h2 id={id} className="text-2xl font-bold">
@@ -158,6 +215,7 @@ function SectionTitle({ id, title, total }: { id: string; title: string; total: 
       </h2>
       <p className="mt-1 text-xl text-slate-800">
         합계 <strong className="tabular-nums">{formatWon(total)}</strong>
+        {note && <span className="ml-3 text-lg text-slate-600">{note}</span>}
       </p>
     </div>
   );

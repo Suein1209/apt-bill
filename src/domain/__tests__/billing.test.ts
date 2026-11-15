@@ -6,7 +6,10 @@ import {
   countTargets,
   dongStatus,
   isDongFullyPaid,
+  perShare,
   summarizeMonth,
+  waterFee,
+  waterRate,
   type MonthRecord,
 } from '../billing.ts';
 import { buildUnits } from '../units.ts';
@@ -39,40 +42,24 @@ describe('부과 대상 (H-9, H-10, C-7)', () => {
 });
 
 describe('균등 분배와 10원 올림 (C-3, C-5, C-9, C-11, C-13)', () => {
-  it('1차 100,000원 ÷ 129곳 → 청구 780원, 표시 775원', () => {
+  it('공용 비용 100,000원 ÷ 129세대 = 775.19… → 1원 자리 올림 780원, 청구도 780원 (F-19)', () => {
     const month = makeMonth('2026-11', { primaryCosts: { labor: 100_000, commonElectricity: 0, commonWater: 0, maintenance: 0 } });
     const bill = billOf(computeBills(units, month, {}, {}), 'R201');
     expect(bill.charged).toBe(780);
-    expect(bill.primaryShare).toBe(775);
+    expect(bill.primaryShare).toBe(780);
   });
 
-  it('1차와 2차를 합쳐 나눈다', () => {
+  it('유지비 지출 내역은 세대당 금액에 넣지 않는다 (F-18)', () => {
     const month = makeMonth('2026-11', {
       primaryCosts: { labor: 64_500, commonElectricity: 0, commonWater: 0, maintenance: 0 },
       secondaryCategories: [{ id: 'c', name: '통신비', items: [{ id: 'i', name: '인터넷', amount: 64_500 }] }],
     });
     const bill = billOf(computeBills(units, month, {}, {}), 'S110');
     expect(bill.primaryShare).toBe(500);
-    expect(bill.secondaryShare).toBe(500);
-    expect(bill.charged).toBe(1_000);
+    expect(bill.charged).toBe(500);
   });
 
-  it('올림은 최종 합계에서 한 번만 — 항목마다 올리면 16,090원, 최종 합계 올림은 16,080원', () => {
-    const month = makeMonth('2026-11', {
-      primaryCosts: { labor: 100_000, commonElectricity: 0, commonWater: 0, maintenance: 0 },
-      water: { R201: { usage: 12, amount: 15_301 } },
-    });
-    const bill = billOf(computeBills(units, month, {}, {}), 'R201');
-    expect(bill.water).toBe(15_301);
-    expect(bill.charged).toBe(16_080); // 775.19… + 15,301 = 16,076.19… → 16,080
-  });
-
-  it('상가는 수도 요금을 넣어도 반영하지 않는다 (F-3)', () => {
-    const month = makeMonth('2026-11', { water: { S110: { usage: 5, amount: 9_000 } } });
-    expect(billOf(computeBills(units, month, {}, {}), 'S110')).toMatchObject({ water: 0, charged: 0 });
-  });
-
-  it('합계·세대당 분배액 (F-14, P-12)', () => {
+  it('세대당 금액은 항목별로 올린 몫의 합 — 인건비 775.19→780, 전기 224.80→230 = 1,010원 (F-14, F-18, F-19, P-12)', () => {
     const month = makeMonth('2026-11', {
       primaryCosts: { labor: 100_000, commonElectricity: 29_000, commonWater: 0, maintenance: 0 },
       secondaryCategories: [{ id: 'c', name: '청소비', items: [{ id: 'i', name: '계단 청소', amount: 25_800 }] }],
@@ -81,7 +68,7 @@ describe('균등 분배와 10원 올림 (C-3, C-5, C-9, C-11, C-13)', () => {
       primaryTotal: 129_000,
       secondaryTotal: 25_800,
       targetCount: ALL_TARGETS,
-      perUnitShare: 1_200,
+      perUnitShare: 1_010,
     });
   });
 
@@ -191,6 +178,7 @@ describe('이월 미납 (C-8, D-9)', () => {
   });
 });
 
+
 describe('동 버튼 미납 현황 (G-4, G-7, G-10, G-11)', () => {
   const month = makeMonth('2026-11', {
     primaryCosts: { labor: 129_000, commonElectricity: 0, commonWater: 0, maintenance: 0 },
@@ -259,5 +247,44 @@ describe('오리집 2세대 몫 (H-22, 2026-11-15 수정)', () => {
     expect(dongStatus(units, confirmed, 5).unpaidCount).toBe(before5 - 1);
     expect(dongStatus(units, confirmed, 6).unpaidCount).toBe(before6 - 1);
     expect(billOf(confirmed, 'SORI')).toMatchObject({ paid: 2_000, unpaid: 0, isConfirmed: true });
+  });
+});
+
+describe('수도 단가와 세대별 수도 요금 (F-17)', () => {
+  const withWater = (patch: Partial<MonthDoc>) =>
+    makeMonth('2026-11', { primaryCosts: { labor: 70_000, commonElectricity: 0, commonWater: 30_000, maintenance: 0 }, waterTotalUsage: 1_000, ...patch });
+
+  it('리터당 단가는 1원 자리 올림 — 30원은 그대로, 3.33원은 10원 (F-19)', () => {
+    expect(waterRate(withWater({}))?.perLiter).toBe(30);
+    const thirds = withWater({ primaryCosts: { labor: 0, commonElectricity: 0, commonWater: 10_000, maintenance: 0 }, waterTotalUsage: 3_000 });
+    expect(waterRate(thirds)?.perLiter).toBe(10);
+  });
+
+  it('세대 수도 요금 = 사용량 × 리터당 단가, 1원 자리 올림 — 12.3 × 10 = 123 → 130원', () => {
+    const thirds = withWater({ primaryCosts: { labor: 0, commonElectricity: 0, commonWater: 10_000, maintenance: 0 }, waterTotalUsage: 3_000 });
+    expect(waterFee(12.3, thirds)).toBe(130);
+    expect(waterFee(12.3, withWater({}))).toBe(370); // 12.3 × 30 = 369 → 370
+    expect(waterFee(10, thirds)).toBe(100);
+  });
+
+  it('수도 금액은 세대로 나누지 않고, 세대당 금액에 사용량 × 단가를 더한 뒤 10원 올림', () => {
+    const month = withWater({ water: { R201: { usage: 12.3 } } });
+    expect(summarizeMonth(units, month).perUnitShare).toBe(550); // 인건비 70,000 ÷ 129 = 542.6 → 550, 수도 30,000은 빠짐
+    const bill = billOf(computeBills(units, month, {}, {}), 'R201');
+    expect(bill).toMatchObject({ primaryShare: 550, water: 370 });
+    expect(bill.charged).toBe(920); // 550 + 370
+    expect(billOf(computeBills(units, month, {}, {}), 'R202').charged).toBe(550); // 사용량 없음 → 수도 0원
+  });
+
+  it('금액이나 총 사용량이 없으면 수도 요금 0원, 상가는 사용량이 있어도 0원', () => {
+    expect(waterFee(10, withWater({ waterTotalUsage: null }))).toBe(0);
+    expect(waterFee(10, withWater({ primaryCosts: { labor: 0, commonElectricity: 0, commonWater: 0, maintenance: 0 } }))).toBe(0);
+    expect(billOf(computeBills(units, withWater({ water: { S110: { usage: 5 } } }), {}, {}), 'S110').water).toBe(0);
+  });
+
+  it('항목별 세대당 금액은 1원 자리 올림 (F-19)', () => {
+    expect(perShare(100_000, 129)).toBe(780);
+    expect(perShare(129_000, 129)).toBe(1_000);
+    expect(perShare(100_000, 0)).toBe(0);
   });
 });

@@ -93,6 +93,11 @@ export function createMonth(db: Firestore, month: MonthDoc, uid: string, previou
   });
 }
 
+/** 수도 단가 계산용 총 사용량(리터) 저장 (F-17) */
+export function saveWaterTotalUsage(db: Firestore, ym: YearMonth, usage: number | null, uid: string): Promise<Result<void>> {
+  return run(() => updateDoc(monthRef(db, ym), { waterTotalUsage: usage, ...stamp(uid) }));
+}
+
 /** 1차 금액 한 칸 저장 (F-4) — 필드 경로로 저장해 다른 칸과 충돌하지 않는다 */
 export function savePrimaryCost(db: Firestore, ym: YearMonth, key: PrimaryFeeKey, amount: Won, uid: string): Promise<Result<void>> {
   const { updatedAt, updatedBy } = stamp(uid);
