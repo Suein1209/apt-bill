@@ -106,7 +106,7 @@ function FirstMonthSetup({ auth, db, uid, onDone }: { auth: Auth; db: Firestore;
         </BigButton>
       </div>
       {confirming && isYearMonth(value) && (
-        <NewMonthDialog db={db} uid={uid} yearMonth={value} previous={null} onDone={onDone} onCancel={() => setConfirming(false)} />
+        <NewMonthDialog db={db} uid={uid} yearMonth={value} previous={null} previousBills={null} onDone={onDone} onCancel={() => setConfirming(false)} />
       )}
     </StatusScreen>
   );

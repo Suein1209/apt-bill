@@ -65,13 +65,30 @@ export function watchMonths(db: Firestore, onChange: (result: Result<MonthMap>) 
   );
 }
 
-/** 새 달 시작 — 월 문서 생성과 현재 달 변경을 한 번에 (관리자, Design §12 Q1) */
-export function createMonth(db: Firestore, month: MonthDoc): Promise<Result<void>> {
+/** 결산 시 월 문서에 쓰는 필드 — 결산 시점 미납액을 확정 저장 (D-6, D-8) */
+function closingFields(unpaid: Record<UnitId, Won>, uid: string) {
+  const now = stamp(uid);
+  const closing: ClosingSnapshot = { closedAt: now.updatedAt, closedBy: uid, unpaid };
+  return { status: 'closed' as const, closing, ...now };
+}
+
+/** 새 달 시작 때 함께 결산할 지난달 */
+export interface PreviousClosing {
+  yearMonth: YearMonth;
+  unpaid: Record<UnitId, Won>;
+}
+
+/**
+ * 새 달 시작 — 월 문서 생성, 현재 달 변경, 지난달 결산을 한 번에 (관리자, Design §12 Q1)
+ * 셋 중 하나라도 실패하면 모두 반영되지 않는다.
+ */
+export function createMonth(db: Firestore, month: MonthDoc, uid: string, previous: PreviousClosing | null): Promise<Result<void>> {
   return run(async () => {
     const batch = writeBatch(db);
     const config: AppConfigDoc = { currentMonth: month.yearMonth };
     batch.set(monthRef(db, month.yearMonth), month);
     batch.set(doc(db, COLLECTION.config, DOC_ID.appConfig), config);
+    if (previous) batch.update(monthRef(db, previous.yearMonth), closingFields(previous.unpaid, uid));
     await batch.commit();
   });
 }
@@ -145,9 +162,7 @@ export function saveWaterField(
 
 /** 결산 (D-6, D-8) — 결산 시점 미납액을 확정 저장 */
 export function closeMonth(db: Firestore, ym: YearMonth, unpaid: Record<UnitId, Won>, uid: string): Promise<Result<void>> {
-  const now = stamp(uid);
-  const closing: ClosingSnapshot = { closedAt: now.updatedAt, closedBy: uid, unpaid };
-  return run(() => updateDoc(monthRef(db, ym), { status: 'closed', closing, ...now }));
+  return run(() => updateDoc(monthRef(db, ym), closingFields(unpaid, uid)));
 }
 
 /** 결산 취소 (D-8) — 스냅샷을 지워 이월이 다시 계산 경로로 돌아간다 */

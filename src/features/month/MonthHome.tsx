@@ -145,6 +145,7 @@ export function MonthHome({ auth, db, uid, profile, units, months, monthList, cu
           uid={uid}
           yearMonth={nextYearMonth(latest)}
           previous={months.get(latest) ?? null}
+          previousBills={month.yearMonth === latest ? bills : null}
           onDone={(ym) => {
             setStartingMonth(false);
             onSelectMonth(ym);
