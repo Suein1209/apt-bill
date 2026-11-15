@@ -24,6 +24,9 @@ export function makePayment(paidAmount: number, confirmed = false): PaymentDoc {
   return {
     paidAmount,
     paidDate: '2026-11-10',
+    paidAt: null,
+    paidBy: null,
+    paidByRole: null,
     confirmed,
     confirmedBy: confirmed ? 'admin' : null,
     confirmedAt: confirmed ? FIXED_TIME : null,

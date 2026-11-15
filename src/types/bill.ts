@@ -154,7 +154,13 @@ export interface MonthDoc {
 /** months/{ym}/payments/{unitId} */
 export interface PaymentDoc {
   paidAmount: Won;
+  /** 납부일 "YYYY-MM-DD" — 완납 때 들어가고 미납으로 바꾸면 지운다 */
   paidDate: ISODate | null;
+  /** 완납으로 바꾼 시각 (G-20). 이 필드가 생기기 전 자료는 null */
+  paidAt: ISODateTime | null;
+  /** 완납으로 바꾼 계정 uid와 그때의 역할 (G-20) */
+  paidBy: string | null;
+  paidByRole: UserRole | null;
   /** 관리자 "납부 완료" 확인 (U-9, U-11) */
   confirmed: boolean;
   confirmedBy: string | null;

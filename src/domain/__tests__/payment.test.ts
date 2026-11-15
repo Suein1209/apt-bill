@@ -1,20 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { canToggleConfirmed, exceedsCharged, isFullyPaid, paidDateFor } from '../payment.ts';
+import { canToggleConfirmed, canTogglePaid, isFullyPaid } from '../payment.ts';
 
-const TODAY = '2026-11-14';
-
-describe('납부 입력 규칙 (G-12 ~ G-15)', () => {
-  it('청구액보다 많이 낼 수 없다', () => {
-    expect(exceedsCharged(50_010, 50_000)).toBe(true);
-    expect(exceedsCharged(50_000, 50_000)).toBe(false);
-    expect(exceedsCharged(1, 0)).toBe(true);
+describe('납부 규칙 (G-15, G-20)', () => {
+  it('미납·완납은 납부 확인 전에만 바꿀 수 있다', () => {
+    expect(canTogglePaid({ charged: 50_000, paid: 0, isConfirmed: false })).toBe(true);
+    expect(canTogglePaid({ charged: 50_000, paid: 50_000, isConfirmed: false })).toBe(true);
+    expect(canTogglePaid({ charged: 50_000, paid: 50_000, isConfirmed: true })).toBe(false);
   });
 
-  it('다 냈으면 납부일을 유지하거나 오늘로, 덜 냈으면 지운다', () => {
-    expect(paidDateFor(50_000, 50_000, null, TODAY)).toBe(TODAY);
-    expect(paidDateFor(50_000, 50_000, '2026-11-10', TODAY)).toBe('2026-11-10');
-    expect(paidDateFor(30_000, 50_000, '2026-11-10', TODAY)).toBeNull();
-    expect(paidDateFor(0, 0, null, TODAY)).toBeNull();
+  it('낼 금액도 낸 금액도 없으면 바꿀 것이 없다', () => {
+    expect(canTogglePaid({ charged: 0, paid: 0, isConfirmed: false })).toBe(false);
+    expect(canTogglePaid({ charged: 0, paid: 10_000, isConfirmed: false })).toBe(true);
   });
 
   it('다 낸 세대만 납부 완료를 누를 수 있고, 이미 완료된 세대는 취소할 수 있다', () => {

@@ -3,7 +3,7 @@ import { COLLECTION } from '../../constants/firestore.ts';
 import { invalidData, ok, toFailure, type Result } from '../result.ts';
 import { parsePaymentDoc } from './parse.ts';
 import type { Payments } from '../../domain/billing.ts';
-import type { ISODate, PaymentDoc, UnitId, Won, YearMonth } from '../../types/bill.ts';
+import type { ISODate, PaymentDoc, UnitId, UserRole, Won, YearMonth } from '../../types/bill.ts';
 
 /** months/{ym}/payments 구독 — 이번 달 미납 현황과 이월 계산용 */
 export function watchPayments(db: Firestore, ym: YearMonth, onChange: (result: Result<Payments>) => void): Unsubscribe {
@@ -36,13 +36,17 @@ async function run(task: () => Promise<void>): Promise<Result<void>> {
   }
 }
 
-export interface PaymentFields {
-  paidAmount?: Won;
-  paidDate?: ISODate | null;
-}
-
-/** 아직 납부 문서가 없는 세대의 기본값 — "납부 완료 아님"으로 시작 */
-const NEW_PAYMENT = { paidAmount: 0, paidDate: null, confirmed: false, confirmedBy: null, confirmedAt: null };
+/** 아직 납부 문서가 없는 세대의 기본값 — "미납·납부 확인 아님"으로 시작 */
+const NEW_PAYMENT = {
+  paidAmount: 0,
+  paidDate: null,
+  paidAt: null,
+  paidBy: null,
+  paidByRole: null,
+  confirmed: false,
+  confirmedBy: null,
+  confirmedAt: null,
+};
 
 /**
  * 트랜잭션 안에서 문서가 있는지 확인하고, 없을 때만 기본값을 채운다.
@@ -60,12 +64,29 @@ function writePayment(db: Firestore, ym: YearMonth, unitId: UnitId, fields: Part
   );
 }
 
+/** 완납 처리 정보 — null이면 미납으로 되돌린다 */
+export interface PaidMark {
+  amount: Won;
+  date: ISODate;
+  at: string;
+  role: UserRole;
+}
+
 /**
- * 납부 금액·납부일 저장 (G-8, U-8) — 넘긴 필드만 바꿔 다른 칸을 덮어쓰지 않는다 (G1).
+ * 납부 상태 전환 (G-20) — 완납이면 청구액·납부일·시각·처리한 계정을 저장하고, 미납이면 모두 지운다.
+ * 납부 관련 필드만 바꿔 다른 칸을 덮어쓰지 않는다 (G1).
  * 관리소장은 보안 규칙상 confirmed=false, confirmedBy=null 인 문서만 쓸 수 있다 (U-10).
  */
-export function savePayment(db: Firestore, ym: YearMonth, unitId: UnitId, fields: PaymentFields, uid: string): Promise<Result<void>> {
-  return writePayment(db, ym, unitId, { ...fields, updatedAt: new Date().toISOString(), updatedBy: uid });
+export function setPaidStatus(db: Firestore, ym: YearMonth, unitId: UnitId, mark: PaidMark | null, uid: string): Promise<Result<void>> {
+  return writePayment(db, ym, unitId, {
+    paidAmount: mark?.amount ?? 0,
+    paidDate: mark?.date ?? null,
+    paidAt: mark?.at ?? null,
+    paidBy: mark ? uid : null,
+    paidByRole: mark?.role ?? null,
+    updatedAt: new Date().toISOString(),
+    updatedBy: uid,
+  });
 }
 
 /** 납부 완료 확인·취소 — 관리자 전용 (U-9, U-14) */

@@ -1,10 +1,10 @@
 /**
- * 납부 입력 규칙 (G-12 ~ G-15)
- *   - 납부 금액은 청구액을 넘을 수 없다
- *   - 청구액만큼 다 냈을 때만 납부일이 남는다 (덜 내면 납부일을 지운다)
- *   - 관리자는 다 낸 세대만 "납부 완료"를 누를 수 있다 (이미 완료된 세대는 취소 가능)
+ * 납부 규칙 (G-15, G-20)
+ *   - 납부 상태는 미납·완납 두 가지다. 완납은 청구액 전액을 낸 것으로 저장한다
+ *   - 관리자가 "납부 확인"한 세대는 납부 상태와 공실을 누구도 바꿀 수 없다
+ *   - 관리자는 다 낸 세대만 "납부 확인"을 누를 수 있다 (이미 확인된 세대는 취소 가능)
  */
-import type { ISODate, UnitBill, Won } from '../types/bill.ts';
+import type { UnitBill } from '../types/bill.ts';
 
 type PaidState = Pick<UnitBill, 'charged' | 'paid'>;
 
@@ -13,17 +13,12 @@ export function isFullyPaid(bill: PaidState): boolean {
   return bill.charged > 0 && bill.paid >= bill.charged;
 }
 
-/** 납부 금액이 청구액을 넘는지 */
-export function exceedsCharged(paidAmount: Won, charged: Won): boolean {
-  return paidAmount > Math.max(charged, 0);
-}
-
 /**
- * 납부 금액을 저장할 때 함께 저장할 납부일.
- *   다 냈으면 기존 날짜(없으면 오늘), 덜 냈으면 null(지움).
+ * 납부 상태(미납↔완납)를 바꿀 수 있는지 — 납부 확인된 세대는 잠근다 (G-20).
+ * 낼 금액이 없고 낸 것도 없으면 바꿀 것이 없다.
  */
-export function paidDateFor(paidAmount: Won, charged: Won, current: ISODate | null, today: ISODate): ISODate | null {
-  return isFullyPaid({ charged, paid: paidAmount }) ? (current ?? today) : null;
+export function canTogglePaid(bill: PaidState & Pick<UnitBill, 'isConfirmed'>): boolean {
+  return !bill.isConfirmed && (bill.charged > 0 || bill.paid > 0);
 }
 
 /** 관리자가 "납부 완료" 체크를 바꿀 수 있는지 — 청구액이 없는 부과 대상은 그대로 허용 */

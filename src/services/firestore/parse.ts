@@ -169,6 +169,9 @@ export function parsePaymentDoc(data: unknown): PaymentDoc | null {
   return {
     paidAmount: data.paidAmount,
     paidDate: typeof data.paidDate === 'string' ? data.paidDate : null,
+    paidAt: typeof data.paidAt === 'string' ? data.paidAt : null,
+    paidBy: typeof data.paidBy === 'string' ? data.paidBy : null,
+    paidByRole: isOneOf(data.paidByRole, USER_ROLES) ? data.paidByRole : null,
     confirmed: data.confirmed,
     confirmedBy: typeof data.confirmedBy === 'string' ? data.confirmedBy : null,
     confirmedAt: typeof data.confirmedAt === 'string' ? data.confirmedAt : null,

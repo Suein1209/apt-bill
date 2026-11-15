@@ -196,8 +196,9 @@ describe('관리소장 — 앱이 쓰는 형태 그대로 (merge 저장)', () =>
     );
   });
 
-  it('공실 체크(필드 경로 저장)는 허용', async () => {
-    await assertSucceeds(updateDoc(doc(db(MANAGER), 'months', CURRENT), { 'vacant.R201': true, updatedAt: 't', updatedBy: MANAGER }));
+  it('공실 체크는 관리자만 (G-21)', async () => {
+    await assertFails(updateDoc(doc(db(MANAGER), 'months', CURRENT), { 'vacant.R201': true, updatedAt: 't', updatedBy: MANAGER }));
+    await assertSucceeds(updateDoc(doc(db(ADMIN), 'months', CURRENT), { 'vacant.R201': true, updatedAt: 't', updatedBy: ADMIN }));
   });
 });
 

@@ -36,6 +36,15 @@ export function todayISODate(now: Date = new Date()): string {
   return `${now.getFullYear()}-${month}-${day}`;
 }
 
+/** 날짜·시각 "YYYY-MM-DD HH:mm" (24시간제, 이 기기 시간대) — 납부 시각 표시 (G-20) */
+export function formatDateTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${todayISODate(date)} ${hours}:${minutes}`;
+}
+
 const ISO_DATE_PATTERN = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 
 export function isISODate(text: string): boolean {
